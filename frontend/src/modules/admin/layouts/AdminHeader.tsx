@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Menu,
   Bell,
@@ -9,9 +10,11 @@ import {
   Sparkles,
   Shield,
   UserCheck,
+  LogOut,
 } from 'lucide-react';
 import { AdminTab } from './AdminSidebar';
 import { AdminProfile } from '../types/admin.types';
+import { useAuth } from '../../../context/AuthContext';
 
 interface AdminHeaderProps {
   currentTab: AdminTab;
@@ -34,6 +37,8 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
   searchTerm,
   onSearchChange,
 }) => {
+  const navigate = useNavigate();
+  const { logout } = useAuth();
   const [showNotifications, setShowNotifications] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const notifRef = useRef<HTMLDivElement>(null);
@@ -389,6 +394,20 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
                   style={{ width: '100%', justifyContent: 'flex-start', fontSize: '0.825rem' }}
                 >
                   <Sparkles size={16} /> Campus Insights
+                </button>
+              </div>
+
+              <div style={{ padding: '0.35rem 0', borderTop: '1px solid var(--border-color)' }}>
+                <button
+                  onClick={() => {
+                    setShowProfileMenu(false);
+                    logout();
+                    navigate('/');
+                  }}
+                  className="btn btn-ghost"
+                  style={{ width: '100%', justifyContent: 'flex-start', fontSize: '0.825rem', color: 'var(--danger)' }}
+                >
+                  <LogOut size={16} /> Sign Out of Admin
                 </button>
               </div>
             </div>

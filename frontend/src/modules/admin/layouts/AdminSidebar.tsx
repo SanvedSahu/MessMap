@@ -1,4 +1,5 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard,
   Utensils,
@@ -12,6 +13,7 @@ import {
   ShieldCheck,
   LogOut,
 } from 'lucide-react';
+import { useAuth } from '../../../context/AuthContext';
 
 export type AdminTab = 'dashboard' | 'messes' | 'users' | 'reviews' | 'reports' | 'settings';
 
@@ -36,6 +38,8 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
   mobileOpen,
   onCloseMobile,
 }) => {
+  const navigate = useNavigate();
+  const { logout } = useAuth();
   const navItems = [
     {
       id: 'dashboard' as AdminTab,
@@ -298,12 +302,15 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
               </div>
 
               <button
-                onClick={() => handleNavClick('settings')}
+                onClick={() => {
+                  logout();
+                  navigate('/');
+                }}
                 className="btn btn-outline btn-sm"
-                style={{ width: '100%', justifyContent: 'flex-start', gap: '0.5rem' }}
+                style={{ width: '100%', justifyContent: 'flex-start', gap: '0.5rem', color: 'var(--danger)', borderColor: 'var(--danger-border)' }}
               >
                 <LogOut size={14} />
-                <span>Sign Out / Switch</span>
+                <span>Sign Out of Admin</span>
               </button>
             </div>
           ) : (
