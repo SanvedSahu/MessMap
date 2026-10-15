@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { AdminSidebar, AdminTab } from './AdminSidebar';
 import { AdminHeader } from './AdminHeader';
 import { AdminProfile } from '../types/admin.types';
-import { ToastContainer, ToastMessage } from '../../../components/Toast';
+import { ToastContainer, ToastMessage } from '../../../components/ui/Toast';
 
 interface AdminLayoutProps {
   currentTab: AdminTab;

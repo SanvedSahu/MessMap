@@ -1,9 +1,9 @@
 import React, { useState, useMemo } from 'react';
 import { Mess } from '../types/admin.types';
-import { Badge, getStatusBadgeVariant } from '../../../components/Badge';
-import { EmptyState } from '../../../components/EmptyState';
-import { Pagination } from '../../../components/Pagination';
-import { ConfirmDialog } from '../../../components/ConfirmDialog';
+import { Badge, getStatusBadgeVariant } from '../../../components/ui/Badge';
+import { EmptyState } from '../../../components/ui/EmptyState';
+import { Pagination } from '../../../components/ui/Pagination';
+import { ConfirmDialog } from '../../../components/ui/ConfirmDialog';
 import {
   Search,
   Filter,

@@ -31,7 +31,7 @@ import {
   ComplaintStatus,
   ReviewStatus,
 } from './types/admin.types';
-import { ToastMessage } from '../../components/Toast';
+import { ToastMessage } from '../../components/ui/Toast';
 import { useMessData } from '../../context/MessDataContext';
 import { useAuth } from '../../context/AuthContext';
 

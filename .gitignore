@@ -1,23 +1,83 @@
-# macOS
+# ==============================================================================
+# OS & File System Artifacts
+# ==============================================================================
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
 
-# Java / Maven
+# ==============================================================================
+# Node & Frontend Build Artifacts
+# ==============================================================================
+node_modules/
+frontend/node_modules/
+dist/
+frontend/dist/
+dist-ssr/
+frontend/dist-ssr/
+.vite/
+frontend/node_modules/.vite/
+*.tsbuildinfo
+
+# ==============================================================================
+# Java & Maven Build Artifacts
+# ==============================================================================
+backend/target/
 target/
 *.class
+*.jar
+*.war
+*.nar
+*.ear
+*.zip
+*.tar.gz
+*.rar
+hs_err_pid*
+replay_pid*
+.mvn/timing.properties
+.mvn/wrapper/maven-wrapper.jar
 
-# Node / React
-node_modules/
-dist/
-build/
-
-# Environment variables and secrets
+# ==============================================================================
+# Environment Variables & Secrets
+# ==============================================================================
 .env
 .env.*
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
 !.env.example
+!frontend/.env.example
 
-# IDE files
+# ==============================================================================
+# IDEs & Developer Tooling
+# ==============================================================================
 .idea/
 .vscode/
+!.vscode/extensions.json
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+*.iml
+.project
+.classpath
+.settings/
 
-# Logs
+# ==============================================================================
+# Logs & Temporary Files
+# ==============================================================================
 *.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+.coverage/
+coverage/
+*.lcov

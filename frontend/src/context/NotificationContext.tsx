@@ -1,12 +1,24 @@
 import React, { createContext, useContext, useState, useCallback } from 'react';
 
-const NotificationContext = createContext();
+export type ToastType = 'success' | 'error' | 'info' | 'warning';
 
-export const NotificationProvider = ({ children }) => {
-  const [toasts, setToasts] = useState([]);
+export interface ToastItem {
+  id: string;
+  message: string;
+  type: ToastType;
+}
 
-  const showToast = useCallback((message, type = 'success') => {
-    const id = Date.now() + Math.random().toString();
+export interface NotificationContextType {
+  showToast: (message: string, type?: ToastType) => void;
+}
+
+const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
+
+export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [toasts, setToasts] = useState<ToastItem[]>([]);
+
+  const showToast = useCallback((message: string, type: ToastType = 'success') => {
+    const id = Date.now().toString() + Math.random().toString();
     setToasts((prev) => [...prev, { id, message, type }]);
 
     setTimeout(() => {
@@ -14,7 +26,7 @@ export const NotificationProvider = ({ children }) => {
     }, 4000);
   }, []);
 
-  const removeToast = useCallback((id) => {
+  const removeToast = useCallback((id: string) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
@@ -40,7 +52,7 @@ export const NotificationProvider = ({ children }) => {
   );
 };
 
-export const useNotification = () => {
+export const useNotification = (): NotificationContextType => {
   const context = useContext(NotificationContext);
   if (!context) {
     throw new Error('useNotification must be used within a NotificationProvider');

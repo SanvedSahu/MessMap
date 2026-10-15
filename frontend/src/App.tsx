@@ -16,41 +16,43 @@ import { FavoritesProvider, useFavorites } from './context/FavoritesContext';
 import { SubscriptionProvider } from './context/SubscriptionContext';
 
 // Route Guard
-import { ProtectedRoute } from './components/ProtectedRoute';
+import { ProtectedRoute } from './routes/ProtectedRoute';
 
 // Landing & Auth Pages
-import { LandingPage } from './modules/landing/LandingPage';
-import { LoginPage } from './modules/auth/LoginPage';
-import { AdminLoginPage } from './modules/auth/AdminLoginPage';
-import { RegisterPage } from './modules/auth/RegisterPage';
-import { PendingApprovalPage } from './modules/owner/PendingApprovalPage';
+import { LandingPage } from './modules/landing';
+import { LoginPage, AdminLoginPage, RegisterPage } from './modules/auth';
 
 // Admin Module
-import { AdminPortalApp } from './modules/admin/AdminPortalApp';
+import { AdminPortalApp } from './modules/admin';
 
 // Mess Owner Module
-import { OwnerLayout } from './layouts/OwnerLayout';
-import { DashboardPage as OwnerDashboardPage } from './pages/owner/DashboardPage';
-import { MenuPage as OwnerMenuPage } from './pages/owner/MenuPage';
-import { ProfilePage as OwnerProfilePage } from './pages/owner/ProfilePage';
-import { EnquiriesPage as OwnerEnquiriesPage } from './pages/owner/EnquiriesPage';
-import { ReviewsPage as OwnerReviewsPage } from './pages/owner/ReviewsPage';
-import { SettingsPage as OwnerSettingsPage } from './pages/owner/SettingsPage';
+import {
+  OwnerLayout,
+  DashboardPage as OwnerDashboardPage,
+  MenuPage as OwnerMenuPage,
+  ProfilePage as OwnerProfilePage,
+  EnquiriesPage as OwnerEnquiriesPage,
+  ReviewsPage as OwnerReviewsPage,
+  SettingsPage as OwnerSettingsPage,
+  PendingApprovalPage,
+} from './modules/owner';
 
 // Student / User Module Components & Pages
-import { Sidebar } from './components/common/Sidebar';
-import { Navbar } from './components/common/Navbar';
-import { Footer } from './components/common/Footer';
+import { Sidebar } from './components/layout/Sidebar';
+import { Navbar } from './components/layout/Navbar';
+import { Footer } from './components/layout/Footer';
 
-import { DashboardPage as StudentDashboardPage } from './pages/DashboardPage';
-import { FindMessPage } from './pages/FindMessPage';
-import { MessDetailsPage } from './pages/MessDetailsPage';
-import { MenuPricingPage } from './pages/MenuPricingPage';
-import { SubscriptionsPage } from './pages/SubscriptionsPage';
-import { ProfilePage as StudentProfilePage } from './pages/ProfilePage';
-import { FavoritesPage } from './pages/FavoritesPage';
-import { ReviewsPage as StudentReviewsPage } from './pages/ReviewsPage';
-import { HelpContactPage } from './pages/HelpContactPage';
+import {
+  StudentDashboardPage,
+  FindMessPage,
+  MessDetailsPage,
+  MenuPricingPage,
+  SubscriptionsPage,
+  StudentProfilePage,
+  FavoritesPage,
+  StudentReviewsPage,
+  HelpContactPage,
+} from './modules/student';
 
 // Student Portal Layout Shell
 const StudentLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {

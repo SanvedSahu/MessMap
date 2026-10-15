@@ -15,6 +15,8 @@ export interface AuthUser {
   avatar?: string;
   messId?: string;
   messName?: string;
+  studentId?: string;
+  joinedDate?: string;
 }
 
 export const DEMO_CREDENTIALS = {
@@ -38,6 +40,7 @@ interface AuthContextType {
   login: (role: UserRole, email: string, password?: string) => { success: boolean; error?: string };
   registerStudent: (data: { name: string; email: string; phone?: string; college?: string }) => void;
   registerOwner: (data: { name: string; email: string; phone?: string; messName?: string; messId?: string }) => void;
+  updateProfile: (data: Partial<AuthUser>) => void;
   logout: () => void;
   demoLogin: (role: 'student' | 'owner' | 'admin') => void;
 }
@@ -117,6 +120,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       college: 'COEP Technological University, Pune',
       hostel: 'Block B, Shivajinagar',
       dietaryPref: 'Pure Veg',
+      studentId: 'COEP-CS-2023-89',
+      joinedDate: 'Aug 2026',
       isAuthenticated: true,
       avatar: 'RP',
     };
@@ -134,6 +139,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       college: data.college || 'Pune University Campus',
       hostel: 'Hostel Campus',
       dietaryPref: 'Pure Veg',
+      studentId: 'PRN-' + Math.floor(100000 + Math.random() * 900000),
+      joinedDate: 'Oct 2026',
       isAuthenticated: true,
       avatar: data.name.substring(0, 2).toUpperCase(),
     };
@@ -153,6 +160,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       avatar: data.name.substring(0, 2).toUpperCase(),
     };
     setUser(newOwner);
+  };
+
+  const updateProfile = (data: Partial<AuthUser>) => {
+    setUser((prev) => ({ ...prev, ...data }));
   };
 
   const logout = () => {
@@ -178,6 +189,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         login,
         registerStudent,
         registerOwner,
+        updateProfile,
         logout,
         demoLogin,
       }}

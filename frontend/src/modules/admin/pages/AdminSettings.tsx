@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { AdminProfile } from '../types/admin.types';
-import { ConfirmDialog } from '../../../components/ConfirmDialog';
+import { ConfirmDialog } from '../../../components/ui/ConfirmDialog';
 import {
   User,
   Shield,

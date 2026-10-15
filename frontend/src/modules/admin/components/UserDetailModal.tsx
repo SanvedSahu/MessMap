@@ -1,6 +1,6 @@
 import React from 'react';
-import { Modal } from '../../../components/Modal';
-import { Badge, getStatusBadgeVariant } from '../../../components/Badge';
+import { Modal } from '../../../components/ui/Modal';
+import { Badge, getStatusBadgeVariant } from '../../../components/ui/Badge';
 import { User } from '../types/admin.types';
 import {
   Mail,

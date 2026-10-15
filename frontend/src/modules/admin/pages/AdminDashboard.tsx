@@ -1,5 +1,5 @@
 import React from 'react';
-import { StatCard } from '../../../components/StatCard';
+import { StatCard } from '../../../components/ui/StatCard';
 import {
   Users,
   Utensils,
