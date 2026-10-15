@@ -21,8 +21,8 @@ MessMap is a full-stack application that helps users discover mess facilities us
 - `database/` — Database scripts
 - `testing/` — Test plans and cases
 
-## Development Branch
-`development` is the default integration branch.
+## Dev Branch
+`dev` is the default integration branch.
 
 ## Project Status
 Initial repository setup.
