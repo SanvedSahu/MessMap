@@ -100,7 +100,7 @@ export const Footer: React.FC = () => {
               <Link to="/find-mess">Find Nearby Messes</Link>
             </li>
             <li>
-              <Link to="/subscriptions">Meal Subscription Pass</Link>
+              <Link to="/reviews">Student Reviews & Ratings</Link>
             </li>
             <li>
               <Link to="/menu-pricing">Weekly Menus & Pricing</Link>

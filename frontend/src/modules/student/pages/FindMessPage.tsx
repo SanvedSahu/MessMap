@@ -13,7 +13,6 @@ import { mockMesses } from '../../../data/mockMesses';
 import { useMessData } from '../../../context/MessDataContext';
 import { MessCard } from '../components/MessCard';
 import { MessMapView } from '../components/MessMapView';
-import { PlanModal } from '../components/PlanModal';
 import { EmptyState } from '../../../components/ui/EmptyState';
 import { MessItem } from '../../../types/student.types';
 
@@ -32,9 +31,6 @@ export const FindMessPage: React.FC = () => {
   const [onlyOpen, setOnlyOpen] = useState<boolean>(false);
   const [selectedMessId, setSelectedMessId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<string>(initialView);
-
-  // Subscription modal
-  const [selectedMessForPlan, setSelectedMessForPlan] = useState<MessItem | null>(null);
 
   // Use only approved messes so pending/rejected never appear in student search
   const liveMesses: MessItem[] = (approvedMesses && approvedMesses.length > 0
@@ -466,7 +462,7 @@ export const FindMessPage: React.FC = () => {
                   borderRadius: 'var(--radius-lg)',
                 }}
               >
-                <MessCard mess={mess} onSubscribeClick={(m) => setSelectedMessForPlan(m)} />
+                <MessCard mess={mess} />
               </div>
             ))}
           </div>
@@ -487,7 +483,6 @@ export const FindMessPage: React.FC = () => {
             <MessCard
               key={mess.id}
               mess={mess}
-              onSubscribeClick={(m) => setSelectedMessForPlan(m)}
             />
           ))}
         </div>
@@ -500,15 +495,6 @@ export const FindMessPage: React.FC = () => {
             height="100%"
           />
         </div>
-      )}
-
-      {/* Plan Subscribe Modal */}
-      {selectedMessForPlan && (
-        <PlanModal
-          mess={selectedMessForPlan}
-          isOpen={!!selectedMessForPlan}
-          onClose={() => setSelectedMessForPlan(null)}
-        />
       )}
     </div>
   );

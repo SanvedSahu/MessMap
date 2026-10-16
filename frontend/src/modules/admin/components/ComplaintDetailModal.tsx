@@ -51,10 +51,19 @@ export const ComplaintDetailModal: React.FC<ComplaintDetailModalProps> = ({
       onClose={onClose}
       title={complaint.subject}
       subtitle={`Ticket ${complaint.ticketNumber} • Logged on ${complaint.date}`}
-      maxWidth="620px"
+      maxWidth="680px"
       footer={
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            width: '100%',
+            flexWrap: 'wrap',
+            gap: '0.75rem',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
             <Badge variant={getStatusBadgeVariant(complaint.status)} dot>
               {complaint.status}
             </Badge>
@@ -63,22 +72,38 @@ export const ComplaintDetailModal: React.FC<ComplaintDetailModalProps> = ({
             </span>
           </div>
 
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
-            <button onClick={onClose} className="btn btn-outline">
+          <div
+            style={{
+              display: 'flex',
+              gap: '0.45rem',
+              flexWrap: 'wrap',
+              alignItems: 'center',
+              justifyContent: 'flex-end',
+            }}
+          >
+            <button onClick={onClose} className="btn btn-outline btn-sm">
               Close
             </button>
             {complaint.status !== 'Resolved' && (
               <>
                 {complaint.status !== 'Under Investigation' && (
-                  <button onClick={handleInvestigate} className="btn btn-outline" style={{ color: '#d97706' }}>
-                    <Clock size={16} /> Under Investigation
+                  <button
+                    onClick={handleInvestigate}
+                    className="btn btn-outline btn-sm"
+                    style={{ color: '#d97706', borderColor: '#fde68a' }}
+                  >
+                    <Clock size={14} /> Under Investigation
                   </button>
                 )}
-                <button onClick={handleDismiss} className="btn btn-ghost" style={{ color: '#64748b' }}>
-                  <XCircle size={16} /> Dismiss
+                <button
+                  onClick={handleDismiss}
+                  className="btn btn-ghost btn-sm"
+                  style={{ color: '#64748b' }}
+                >
+                  <XCircle size={14} /> Dismiss
                 </button>
-                <button onClick={handleResolve} className="btn btn-success">
-                  <CheckCircle2 size={16} /> Resolve Grievance
+                <button onClick={handleResolve} className="btn btn-success btn-sm">
+                  <CheckCircle2 size={14} /> Resolve Grievance
                 </button>
               </>
             )}
@@ -150,7 +175,7 @@ export const ComplaintDetailModal: React.FC<ComplaintDetailModalProps> = ({
             onChange={(e) => setAdminNote(e.target.value)}
           />
           <span style={{ fontSize: '0.725rem', color: 'var(--text-muted)', marginTop: '0.25rem', display: 'block' }}>
-            These notes will be archived in the student's official case docket.
+            These notes will be archived in the student's official grievance case record.
           </span>
         </div>
       </div>

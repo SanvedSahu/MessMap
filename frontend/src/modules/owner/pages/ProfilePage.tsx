@@ -12,7 +12,10 @@ import {
   Sparkles,
   Wifi,
   Droplets,
-  Award
+  Award,
+  Plus,
+  X,
+  Check,
 } from 'lucide-react';
 import './ProfilePage.css';
 
@@ -20,22 +23,111 @@ export const ProfilePage: React.FC = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
+  // Load saved profile data or use defaults
+  const savedProfile = (() => {
+    try {
+      const item = localStorage.getItem('messmap_owner_profile_data');
+      return item ? JSON.parse(item) : null;
+    } catch {
+      return null;
+    }
+  })();
+
   // Profile data states
-  const [messName, setMessName] = useState('Annapurna Deluxe Mess');
-  const [ownerName, setOwnerName] = useState('Rajesh Sharma');
-  const [phone, setPhone] = useState('+91 98231 44550');
-  const [email, setEmail] = useState('contact@annapurnamess.com');
-  const [address, setAddress] = useState('Shop No. 4 & 5, Near Bharati Vidyapeeth Gate 2, Katraj-Kondhwa Road');
-  const [city, setCity] = useState('Pune');
-  const [pincode, setPincode] = useState('411046');
-  const [monthlyPrice, setMonthlyPrice] = useState('3200');
-  const [dailyPrice, setDailyPrice] = useState('110');
-  const [description, setDescription] = useState(
-    'Serving hygienic, homemade traditional Maharashtrian and North Indian thalis for college students and working professionals since 2018. Daily fresh rotis, seasonal vegetables, and unlimited rice.'
+  const [messName, setMessName] = useState(savedProfile?.messName || 'Annapurna Deluxe Mess');
+  const [ownerName, setOwnerName] = useState(savedProfile?.ownerName || 'Rajesh Sharma');
+  const [phone, setPhone] = useState(savedProfile?.phone || '+91 98231 44550');
+  const [email, setEmail] = useState(savedProfile?.email || 'contact@annapurnamess.com');
+  const [address, setAddress] = useState(
+    savedProfile?.address || 'Shop No. 4 & 5, Near Bharati Vidyapeeth Gate 2, Katraj-Kondhwa Road'
   );
+  const [city, setCity] = useState(savedProfile?.city || 'Pune');
+  const [pincode, setPincode] = useState(savedProfile?.pincode || '411046');
+  const [monthlyPrice, setMonthlyPrice] = useState(savedProfile?.monthlyPrice || '3200');
+  const [dailyPrice, setDailyPrice] = useState(savedProfile?.dailyPrice || '110');
+  const [description, setDescription] = useState(
+    savedProfile?.description ||
+      'Serving hygienic, homemade traditional Maharashtrian and North Indian thalis for college students and working professionals since 2018. Daily fresh rotis, seasonal vegetables, and unlimited rice.'
+  );
+
+  // Operating Timings
+  const [breakfastTiming, setBreakfastTiming] = useState(
+    savedProfile?.breakfastTiming || '7:30 AM – 10:00 AM'
+  );
+  const [lunchTiming, setLunchTiming] = useState(
+    savedProfile?.lunchTiming || '12:30 PM – 3:30 PM'
+  );
+  const [dinnerTiming, setDinnerTiming] = useState(
+    savedProfile?.dinnerTiming || '7:30 PM – 10:30 PM'
+  );
+
+  // Amenities & Highlights
+  const [amenities, setAmenities] = useState<string[]>(
+    savedProfile?.amenities || [
+      'RO Filtered Water',
+      'Unlimited Roti / Rice',
+      'Free High-Speed WiFi',
+      'Airy Seating (60+ Diners)',
+      'Daily Cleanliness Checks',
+      'Tiffin Delivery Service',
+    ]
+  );
+  const [customAmenity, setCustomAmenity] = useState('');
+
+  const commonAmenities = [
+    'RO Filtered Water',
+    'Unlimited Roti / Rice',
+    'Free High-Speed WiFi',
+    'Airy Seating (60+ Diners)',
+    'Daily Cleanliness Checks',
+    'Tiffin Delivery Service',
+    'Pure Veg Kitchen',
+    'Air Conditioned',
+    'CCTV Security',
+    'Separate Handwash Area',
+  ];
+
+  const handleToggleAmenity = (name: string) => {
+    setAmenities((prev) =>
+      prev.includes(name) ? prev.filter((a) => a !== name) : [...prev, name]
+    );
+  };
+
+  const handleAddCustomAmenity = (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (customAmenity.trim() && !amenities.includes(customAmenity.trim())) {
+      setAmenities((prev) => [...prev, customAmenity.trim()]);
+      setCustomAmenity('');
+    }
+  };
+
+  const handleRemoveAmenity = (name: string) => {
+    setAmenities((prev) => prev.filter((a) => a !== name));
+  };
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
+    const dataToSave = {
+      messName,
+      ownerName,
+      phone,
+      email,
+      address,
+      city,
+      pincode,
+      monthlyPrice,
+      dailyPrice,
+      description,
+      breakfastTiming,
+      lunchTiming,
+      dinnerTiming,
+      amenities,
+    };
+    try {
+      localStorage.setItem('messmap_owner_profile_data', JSON.stringify(dataToSave));
+    } catch {
+      // ignore
+    }
     setIsEditing(false);
     setSaveSuccess(true);
     setTimeout(() => setSaveSuccess(false), 3500);
@@ -256,36 +348,171 @@ export const ProfilePage: React.FC = () => {
                   <Coffee size={16} className="timing-icon" />
                   <span>Breakfast</span>
                 </div>
-                <span className="timing-hours">7:30 AM – 10:00 AM</span>
+                {isEditing ? (
+                  <input
+                    type="text"
+                    value={breakfastTiming}
+                    onChange={(e) => setBreakfastTiming(e.target.value)}
+                    className="form-input"
+                    style={{ maxWidth: '200px', padding: '4px 8px', fontSize: '0.82rem' }}
+                    placeholder="e.g. 7:30 AM – 10:00 AM"
+                  />
+                ) : (
+                  <span className="timing-hours">{breakfastTiming}</span>
+                )}
               </div>
+
               <div className="timing-row">
                 <div className="timing-type">
                   <Sun size={16} className="timing-icon" />
                   <span>Lunch</span>
                 </div>
-                <span className="timing-hours">12:30 PM – 3:30 PM</span>
+                {isEditing ? (
+                  <input
+                    type="text"
+                    value={lunchTiming}
+                    onChange={(e) => setLunchTiming(e.target.value)}
+                    className="form-input"
+                    style={{ maxWidth: '200px', padding: '4px 8px', fontSize: '0.82rem' }}
+                    placeholder="e.g. 12:30 PM – 3:30 PM"
+                  />
+                ) : (
+                  <span className="timing-hours">{lunchTiming}</span>
+                )}
               </div>
+
               <div className="timing-row">
                 <div className="timing-type">
                   <Moon size={16} className="timing-icon" />
                   <span>Dinner</span>
                 </div>
-                <span className="timing-hours">7:30 PM – 10:30 PM</span>
+                {isEditing ? (
+                  <input
+                    type="text"
+                    value={dinnerTiming}
+                    onChange={(e) => setDinnerTiming(e.target.value)}
+                    className="form-input"
+                    style={{ maxWidth: '200px', padding: '4px 8px', fontSize: '0.82rem' }}
+                    placeholder="e.g. 7:30 PM – 10:30 PM"
+                  />
+                ) : (
+                  <span className="timing-hours">{dinnerTiming}</span>
+                )}
               </div>
             </div>
           </div>
 
-          {/* Facilities */}
+          {/* Amenities & Highlights */}
           <div className="card profile-card">
             <h3 className="card-section-title">Amenities & Highlights</h3>
-            <div className="facilities-tags-wrap">
-              <span className="facility-tag"><Droplets size={14} /> RO Filtered Water</span>
-              <span className="facility-tag"><Sparkles size={14} /> Unlimited Roti / Rice</span>
-              <span className="facility-tag"><Wifi size={14} /> Free High-Speed WiFi</span>
-              <span className="facility-tag">Airy Seating (60+ Diners)</span>
-              <span className="facility-tag">Daily Cleanliness Checks</span>
-              <span className="facility-tag">Tiffin Delivery Service</span>
-            </div>
+            
+            {isEditing ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                  Click to select/unselect common amenities or add your own:
+                </div>
+
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                  {commonAmenities.map((item) => {
+                    const isSelected = amenities.includes(item);
+                    return (
+                      <button
+                        key={item}
+                        type="button"
+                        onClick={() => handleToggleAmenity(item)}
+                        style={{
+                          background: isSelected ? 'var(--primary-light)' : '#f8fafc',
+                          color: isSelected ? 'var(--primary-dark)' : 'var(--text-muted)',
+                          border: `1.5px solid ${isSelected ? 'var(--primary)' : 'var(--border-color)'}`,
+                          padding: '4px 10px',
+                          borderRadius: 'var(--radius-full)',
+                          fontSize: '0.78rem',
+                          fontWeight: isSelected ? 700 : 500,
+                          cursor: 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                        }}
+                      >
+                        {isSelected ? <Check size={12} /> : <Plus size={12} />}
+                        {item}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Add custom amenity */}
+                <div style={{ display: 'flex', gap: '6px', marginTop: '6px' }}>
+                  <input
+                    type="text"
+                    value={customAmenity}
+                    onChange={(e) => setCustomAmenity(e.target.value)}
+                    placeholder="Add custom amenity..."
+                    className="form-input"
+                    style={{ padding: '4px 8px', fontSize: '0.82rem' }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        if (customAmenity.trim() && !amenities.includes(customAmenity.trim())) {
+                          setAmenities((prev) => [...prev, customAmenity.trim()]);
+                          setCustomAmenity('');
+                        }
+                      }
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAddCustomAmenity}
+                    className="btn btn-outline btn-sm"
+                    style={{ whiteSpace: 'nowrap' }}
+                  >
+                    + Add
+                  </button>
+                </div>
+
+                {/* Currently selected tags preview with remove */}
+                <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '8px' }}>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '6px' }}>
+                    Active on Mess Profile ({amenities.length}):
+                  </div>
+                  <div className="facilities-tags-wrap">
+                    {amenities.map((item) => (
+                      <span key={item} className="facility-tag" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                        {item}
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveAmenity(item)}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            color: '#ef4444',
+                            cursor: 'pointer',
+                            padding: '0 2px',
+                            display: 'flex',
+                            alignItems: 'center',
+                          }}
+                          title="Remove amenity"
+                        >
+                          <X size={12} />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="facilities-tags-wrap">
+                {amenities.map((item) => (
+                  <span key={item} className="facility-tag">
+                    {item.includes('Water') ? <Droplets size={14} /> :
+                     item.includes('WiFi') ? <Wifi size={14} /> :
+                     item.includes('Roti') ? <Sparkles size={14} /> :
+                     <Check size={14} color="var(--primary)" />}
+                    {item}
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Save Action If Editing */}

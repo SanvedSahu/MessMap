@@ -187,7 +187,7 @@ export const LandingPage: React.FC = () => {
                 <Check size={16} color="var(--primary)" /> Live daily lunch and dinner menu listings
               </li>
               <li>
-                <Check size={16} color="var(--primary)" /> Student meal passes and QR code tracking
+                <Check size={16} color="var(--primary)" /> Authentic community reviews & hygiene ratings
               </li>
             </ul>
             <div style={{ display: 'flex', gap: '0.5rem', marginTop: 'auto' }}>
@@ -244,7 +244,7 @@ export const LandingPage: React.FC = () => {
             </p>
             <ul className="role-features-list">
               <li>
-                <Check size={16} color="#2563eb" /> Review pending mess registration dossiers
+                <Check size={16} color="#2563eb" /> Review pending mess registration applications
               </li>
               <li>
                 <Check size={16} color="#2563eb" /> Verify hygiene standards, approve or reject
@@ -308,7 +308,7 @@ export const LandingPage: React.FC = () => {
 
                   <div style={{ marginTop: 'auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '10px', borderTop: '1px solid var(--border-color)' }}>
                     <div>
-                      <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'block' }}>Monthly Pass</span>
+                      <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'block' }}>Monthly Rate</span>
                       <span style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-main)' }}>
                         ₹{mess.monthlyPrice}
                       </span>

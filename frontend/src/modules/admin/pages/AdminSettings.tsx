@@ -200,7 +200,7 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
                     Immediate Email on New Mess Registration
                   </div>
                   <div style={{ fontSize: '0.785rem', color: 'var(--text-muted)' }}>
-                    Receive health inspection docket whenever an owner registers.
+                    Receive health inspection report whenever an owner registers.
                   </div>
                 </div>
                 <input

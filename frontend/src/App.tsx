@@ -3,7 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate, NavLink } from 'react-router-do
 import {
   LayoutDashboard,
   Compass,
-  CreditCard,
+  Star,
   Heart,
   User
 } from 'lucide-react';
@@ -47,7 +47,6 @@ import {
   FindMessPage,
   MessDetailsPage,
   MenuPricingPage,
-  SubscriptionsPage,
   StudentProfilePage,
   FavoritesPage,
   StudentReviewsPage,
@@ -86,11 +85,11 @@ const StudentLayout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
           <span>Find Mess</span>
         </NavLink>
         <NavLink
-          to="/subscriptions"
+          to="/reviews"
           className={({ isActive }) => `mobile-nav-link ${isActive ? 'active' : ''}`}
         >
-          <CreditCard size={20} />
-          <span>Pass</span>
+          <Star size={20} />
+          <span>Reviews</span>
         </NavLink>
         <NavLink
           to="/favorites"
@@ -207,13 +206,7 @@ export const App: React.FC = () => {
                   />
                   <Route
                     path="/subscriptions"
-                    element={
-                      <ProtectedRoute allowedRole="student">
-                        <StudentLayout>
-                          <SubscriptionsPage />
-                        </StudentLayout>
-                      </ProtectedRoute>
-                    }
+                    element={<Navigate to="/student/dashboard" replace />}
                   />
                   <Route
                     path="/favorites"

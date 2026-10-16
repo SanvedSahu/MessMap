@@ -15,6 +15,9 @@ import {
   MapPin,
   ShieldCheck,
   Plus,
+  AlertOctagon,
+  RotateCcw,
+  Trash2,
 } from 'lucide-react';
 
 interface MessManagementProps {
@@ -22,6 +25,9 @@ interface MessManagementProps {
   onSelectMess: (mess: Mess) => void;
   onApproveMess: (id: string) => void;
   onRejectMess: (id: string, reason?: string) => void;
+  onSuspendMess?: (id: string) => void;
+  onUnsuspendMess?: (id: string) => void;
+  onDeleteMess?: (id: string) => void;
   onAddNewMess: (newMess: Mess) => void;
   searchTerm: string;
   onSearchChange: (val: string) => void;
@@ -32,6 +38,9 @@ export const MessManagement: React.FC<MessManagementProps> = ({
   onSelectMess,
   onApproveMess,
   onRejectMess,
+  onSuspendMess,
+  onUnsuspendMess,
+  onDeleteMess,
   onAddNewMess,
   searchTerm,
   onSearchChange,
@@ -192,6 +201,7 @@ export const MessManagement: React.FC<MessManagementProps> = ({
               <option value="Approved">Approved</option>
               <option value="Pending">Pending</option>
               <option value="Rejected">Rejected</option>
+              <option value="Suspended">Suspended</option>
               <option value="Under Review">Under Review</option>
             </select>
           </div>
@@ -327,13 +337,13 @@ export const MessManagement: React.FC<MessManagementProps> = ({
                     </td>
 
                     <td style={{ textAlign: 'right' }}>
-                      <div style={{ display: 'inline-flex', gap: '0.4rem' }}>
+                      <div style={{ display: 'inline-flex', gap: '0.4rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                         <button
                           onClick={() => onSelectMess(mess)}
                           className="btn btn-outline btn-sm"
-                          title="View Full Profile"
+                          title="View Mess Details"
                         >
-                          <Eye size={14} /> Dossier
+                          <Eye size={14} /> Details
                         </button>
 
                         {mess.status === 'Pending' && (
@@ -343,15 +353,53 @@ export const MessManagement: React.FC<MessManagementProps> = ({
                               className="btn btn-success btn-sm"
                               title="Approve Mess Listing"
                             >
-                              <CheckCircle size={14} />
+                              <CheckCircle size={14} /> Approve
                             </button>
                             <button
                               onClick={() => setRejectingMessId(mess.id)}
                               className="btn btn-danger btn-sm"
                               title="Reject Mess Listing"
                             >
-                              <XCircle size={14} />
+                              <XCircle size={14} /> Reject
                             </button>
+                          </>
+                        )}
+
+                        {mess.status === 'Approved' && onSuspendMess && (
+                          <button
+                            onClick={() => onSuspendMess(mess.id)}
+                            className="btn btn-outline btn-sm"
+                            style={{ color: '#ef4444', borderColor: '#fca5a5' }}
+                            title="Suspend Mess"
+                          >
+                            <AlertOctagon size={14} /> Suspend
+                          </button>
+                        )}
+
+                        {(mess.status === 'Suspended' || mess.status === 'Under Review') && (
+                          <>
+                            {onUnsuspendMess && (
+                              <button
+                                onClick={() => onUnsuspendMess(mess.id)}
+                                className="btn btn-success btn-sm"
+                                title="Unsuspend and Reactivate"
+                              >
+                                <RotateCcw size={14} /> Unsuspend
+                              </button>
+                            )}
+                            {onDeleteMess && (
+                              <button
+                                onClick={() => {
+                                  if (window.confirm(`Are you sure you want to completely remove "${mess.name}" from the mess directory?`)) {
+                                    onDeleteMess(mess.id);
+                                  }
+                                }}
+                                className="btn btn-danger btn-sm"
+                                title="Remove from Directory"
+                              >
+                                <Trash2 size={14} /> Remove
+                              </button>
+                            )}
                           </>
                         )}
                       </div>
@@ -419,14 +467,44 @@ export const MessManagement: React.FC<MessManagementProps> = ({
                     </div>
                   </div>
 
-                  <div style={{ display: 'flex', gap: '0.4rem' }}>
+                  <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
                     <button onClick={() => onSelectMess(mess)} className="btn btn-outline btn-sm">
-                      Dossier
+                      <Eye size={14} /> Details
                     </button>
                     {mess.status === 'Pending' && (
                       <button onClick={() => onApproveMess(mess.id)} className="btn btn-success btn-sm">
-                        Approve
+                        <CheckCircle size={14} /> Approve
                       </button>
+                    )}
+                    {mess.status === 'Approved' && onSuspendMess && (
+                      <button
+                        onClick={() => onSuspendMess(mess.id)}
+                        className="btn btn-outline btn-sm"
+                        style={{ color: '#ef4444', borderColor: '#fca5a5' }}
+                      >
+                        <AlertOctagon size={14} /> Suspend
+                      </button>
+                    )}
+                    {(mess.status === 'Suspended' || mess.status === 'Under Review') && (
+                      <>
+                        {onUnsuspendMess && (
+                          <button onClick={() => onUnsuspendMess(mess.id)} className="btn btn-success btn-sm">
+                            <RotateCcw size={14} /> Unsuspend
+                          </button>
+                        )}
+                        {onDeleteMess && (
+                          <button
+                            onClick={() => {
+                              if (window.confirm(`Are you sure you want to remove "${mess.name}" from the directory?`)) {
+                                onDeleteMess(mess.id);
+                              }
+                            }}
+                            className="btn btn-danger btn-sm"
+                          >
+                            <Trash2 size={14} /> Remove
+                          </button>
+                        )}
+                      </>
                     )}
                   </div>
                 </div>

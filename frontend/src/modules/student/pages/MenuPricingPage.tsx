@@ -9,13 +9,11 @@ import {
   Moon,
 } from 'lucide-react';
 import { mockMesses } from '../../../data/mockMesses';
-import { PlanModal } from '../components/PlanModal';
 import { MessItem } from '../../../types/student.types';
 
 export const MenuPricingPage: React.FC = () => {
   const [selectedDay, setSelectedDay] = useState<string>('Today');
   const [selectedMessId, setSelectedMessId] = useState<string>(mockMesses[0].id);
-  const [selectedMessForPlan, setSelectedMessForPlan] = useState<MessItem | null>(null);
 
   // Interactive Student Calculator State
   const [calcMealsPerDay, setCalcMealsPerDay] = useState<number>(2);
@@ -394,20 +392,19 @@ export const MenuPricingPage: React.FC = () => {
                 marginBottom: '1.5rem',
               }}
             >
-              <li>✓ Instant single meal pass</li>
+              <li>✓ Instant single meal thali</li>
               <li>✓ Unlimited hot phulkas & dal</li>
               <li>✓ No advance commitment</li>
+              <li>✓ Walk-in and dine directly</li>
               <li>✗ No Sunday sweet included</li>
-              <li>✗ No meal pause needed</li>
             </ul>
-            <button
-              type="button"
-              onClick={() => setSelectedMessForPlan(selectedMess)}
+            <Link
+              to={`/mess/${selectedMess.id}`}
               className="btn btn-outline btn-sm"
               style={{ marginTop: 'auto' }}
             >
-              Get Meal Token
-            </button>
+              View Mess & Contact →
+            </Link>
           </div>
 
           {/* Plan 2: 15-Day Flexi */}
@@ -430,7 +427,7 @@ export const MenuPricingPage: React.FC = () => {
                 color: 'var(--text-main)',
               }}
             >
-              15-Day Flexi Pass
+              15-Day Flexi Plan
             </h3>
             <div
               style={{
@@ -461,14 +458,13 @@ export const MenuPricingPage: React.FC = () => {
               <li>✓ 2 Days meal pause allowed</li>
               <li>✓ Ideal for semester exam weeks</li>
             </ul>
-            <button
-              type="button"
-              onClick={() => setSelectedMessForPlan(selectedMess)}
+            <Link
+              to={`/mess/${selectedMess.id}`}
               className="btn btn-outline btn-sm"
               style={{ marginTop: 'auto' }}
             >
-              Choose 15-Day Pass
-            </button>
+              View Mess & Contact →
+            </Link>
           </div>
 
           {/* Plan 3: Monthly Standard (Popular) */}
@@ -544,16 +540,15 @@ export const MenuPricingPage: React.FC = () => {
               <li>✓ Unlimited phulkas & rice</li>
               <li>✓ Free Sunday Sweet Feast included</li>
               <li>✓ Up to 6 Days Meal Pause with validity extension</li>
-              <li>✓ Digital QR meal pass on phone</li>
+              <li>✓ Reliable monthly dining near campus</li>
             </ul>
-            <button
-              type="button"
-              onClick={() => setSelectedMessForPlan(selectedMess)}
+            <Link
+              to={`/mess/${selectedMess.id}`}
               className="btn btn-primary btn-sm"
               style={{ marginTop: 'auto' }}
             >
-              Subscribe Standard
-            </button>
+              View Mess & Contact →
+            </Link>
           </div>
 
           {/* Plan 4: Complete */}
@@ -607,14 +602,13 @@ export const MenuPricingPage: React.FC = () => {
               <li>✓ Priority counter access</li>
               <li>✓ Free hostel tiffin delivery</li>
             </ul>
-            <button
-              type="button"
-              onClick={() => setSelectedMessForPlan(selectedMess)}
+            <Link
+              to={`/mess/${selectedMess.id}`}
               className="btn btn-outline btn-sm"
               style={{ marginTop: 'auto' }}
             >
-              Subscribe Complete
-            </button>
+              View Mess & Contact →
+            </Link>
           </div>
         </div>
       </div>
@@ -793,15 +787,6 @@ export const MenuPricingPage: React.FC = () => {
           </div>
         </div>
       </div>
-
-      {/* Plan Modal */}
-      {selectedMessForPlan && (
-        <PlanModal
-          mess={selectedMessForPlan}
-          isOpen={!!selectedMessForPlan}
-          onClose={() => setSelectedMessForPlan(null)}
-        />
-      )}
     </div>
   );
 };

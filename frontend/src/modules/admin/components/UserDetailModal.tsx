@@ -29,7 +29,7 @@ export const UserDetailModal: React.FC<UserDetailModalProps> = ({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title="User Account Dossier"
+      title="User Account Details"
       subtitle={`Account Identifier: ${user.id}`}
       maxWidth="540px"
       footer={

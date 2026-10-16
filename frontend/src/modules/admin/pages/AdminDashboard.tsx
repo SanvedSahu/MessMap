@@ -256,7 +256,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                             className="btn btn-outline btn-sm"
                             title="Inspect details"
                           >
-                            Dossier
+                            Details
                           </button>
                           <button
                             onClick={() => onQuickApproveMess(mess.id)}

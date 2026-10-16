@@ -59,10 +59,10 @@ const mockEnquiries: Enquiry[] = [
     college: 'MIT WPU',
     phone: '+91 97654 32109',
     planType: 'Monthly (Lunch only)',
-    message: 'Interested in lunch-only subscription for 30 days. Is there a trial period of 3 days before full payment?',
+    message: 'Interested in lunch-only meal plan for 30 days. Can I visit today to taste the food before joining?',
     date: '10 Oct, 2026',
     status: 'replied',
-    replyNotes: 'Replied via call. Shared bank details for 3-day trial pass.',
+    replyNotes: 'Replied via call. Invited student for lunch tasting today.',
   },
 ];
 

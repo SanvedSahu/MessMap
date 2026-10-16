@@ -23,6 +23,8 @@ interface MessDetailModalProps {
   onApprove: (id: string) => void;
   onReject: (id: string) => void;
   onSuspend?: (id: string) => void;
+  onUnsuspend?: (id: string) => void;
+  onDelete?: (id: string) => void;
 }
 
 export const MessDetailModal: React.FC<MessDetailModalProps> = ({
@@ -32,8 +34,12 @@ export const MessDetailModal: React.FC<MessDetailModalProps> = ({
   onApprove,
   onReject,
   onSuspend,
+  onUnsuspend,
+  onDelete,
 }) => {
   if (!mess) return null;
+
+  const isSuspended = mess.status === 'Suspended' || mess.status === 'Under Review';
 
   return (
     <Modal
@@ -43,7 +49,7 @@ export const MessDetailModal: React.FC<MessDetailModalProps> = ({
       subtitle={`Registration ID: ${mess.id} • Registered on ${mess.registeredDate}`}
       maxWidth="680px"
       footer={
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', flexWrap: 'wrap', gap: '0.75rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <Badge variant={getStatusBadgeVariant(mess.status)} dot>
               {mess.status}
@@ -53,7 +59,7 @@ export const MessDetailModal: React.FC<MessDetailModalProps> = ({
             </span>
           </div>
 
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
+          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
             <button onClick={onClose} className="btn btn-outline">
               Close
             </button>
@@ -87,8 +93,36 @@ export const MessDetailModal: React.FC<MessDetailModalProps> = ({
                 }}
                 className="btn btn-danger btn-sm"
               >
-                <AlertOctagon size={16} /> Suspend Listing
+                <AlertOctagon size={16} /> Suspend Mess
               </button>
+            )}
+            {isSuspended && (
+              <>
+                {onUnsuspend && (
+                  <button
+                    onClick={() => {
+                      onUnsuspend(mess.id);
+                      onClose();
+                    }}
+                    className="btn btn-success btn-sm"
+                  >
+                    <CheckCircle size={16} /> Unsuspend Mess
+                  </button>
+                )}
+                {onDelete && (
+                  <button
+                    onClick={() => {
+                      if (window.confirm(`Are you sure you want to completely remove "${mess.name}" from the campus directory?`)) {
+                        onDelete(mess.id);
+                        onClose();
+                      }
+                    }}
+                    className="btn btn-danger btn-sm"
+                  >
+                    <XCircle size={16} /> Remove from Directory
+                  </button>
+                )}
+              </>
             )}
           </div>
         </div>

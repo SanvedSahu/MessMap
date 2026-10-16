@@ -4,6 +4,21 @@
 
 export const mockReviews = [
   {
+    id: 'rev-user-1',
+    messId: 'mess-1',
+    messName: 'Annapurna Executive Mess',
+    userName: 'Rahul Patil',
+    college: 'COEP Technological University',
+    rating: 5,
+    date: '2026-10-12',
+    foodQuality: 5,
+    hygiene: 5,
+    valueForMoney: 5,
+    comment: 'Eating here regularly for the past 6 months. Hot phulkas served straight from the tawa and the dal tadka is consistently flavorful. Great hygiene maintained during peak lunch rush!',
+    likes: 12,
+    tags: ['Hot Phulkas', 'Clean Kitchen', 'Fast Service']
+  },
+  {
     id: 'rev-1',
     messId: 'mess-1',
     messName: 'Annapurna Executive Mess',

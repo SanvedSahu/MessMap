@@ -299,7 +299,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({
                           className="btn btn-outline btn-sm"
                           title="View Profile Details"
                         >
-                          <Eye size={14} /> Dossier
+                          <Eye size={14} /> Details
                         </button>
 
                         <button

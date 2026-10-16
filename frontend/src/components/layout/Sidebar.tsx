@@ -4,7 +4,6 @@ import {
   Home,
   LayoutDashboard,
   Compass,
-  CreditCard,
   UtensilsCrossed,
   Heart,
   Star,
@@ -15,7 +14,6 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useFavorites } from '../../context/FavoritesContext';
-import { useSubscription } from '../../context/SubscriptionContext';
 
 export interface SidebarProps {
   isOpen: boolean;
@@ -26,18 +24,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
   const navigate = useNavigate();
   const { user, isAuthenticated, logout } = useAuth();
   const { favorites } = useFavorites();
-  const { subscription } = useSubscription();
 
   const navLinks = [
     { to: '/', label: 'Campus Home', icon: Home },
     { to: '/student/dashboard', label: 'Student Dashboard', icon: LayoutDashboard },
     { to: '/find-mess', label: 'Find Nearby Messes', icon: Compass },
-    {
-      to: '/subscriptions',
-      label: 'My Subscriptions',
-      icon: CreditCard,
-      badge: subscription?.status === 'Active' ? 'Active' : null,
-    },
     { to: '/menu-pricing', label: 'Menu & Pricing', icon: UtensilsCrossed },
     {
       to: '/favorites',
@@ -65,7 +56,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                 <span className="brand-tag">Student</span>
               </div>
               <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                Mess Discovery & Subscriptions
+                Campus Food & Mess Discovery
               </div>
             </div>
 

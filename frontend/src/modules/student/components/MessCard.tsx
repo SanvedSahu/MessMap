@@ -228,15 +228,7 @@ export const MessCard: React.FC<MessCardProps> = ({ mess, onSubscribeClick }) =>
             </div>
           </div>
 
-          <div style={{ display: 'flex', gap: '6px' }}>
-            <button
-              type="button"
-              onClick={handleSubscribe}
-              className="btn btn-outline btn-sm"
-              title="Subscribe to plan"
-            >
-              Subscribe
-            </button>
+          <div>
             <Link to={`/mess/${mess.id}`} className="btn btn-primary btn-sm">
               View Menu & Details →
             </Link>

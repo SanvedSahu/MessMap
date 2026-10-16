@@ -16,7 +16,6 @@ export const SettingsPage: React.FC = () => {
   const [smsEnquiryAlert, setSmsEnquiryAlert] = useState(true);
   const [emailReviewAlert, setEmailReviewAlert] = useState(true);
   const [autoCloseSundayDinner, setAutoCloseSundayDinner] = useState(true);
-  const [instantBookingEnabled, setInstantBookingEnabled] = useState(false);
 
   const handleSaveSettings = (e: React.FormEvent) => {
     e.preventDefault();
@@ -81,21 +80,6 @@ export const SettingsPage: React.FC = () => {
                   type="checkbox"
                   checked={autoCloseSundayDinner}
                   onChange={(e) => setAutoCloseSundayDinner(e.target.checked)}
-                  className="switch-checkbox"
-                />
-              </label>
-
-              <label className="toggle-setting-row">
-                <div className="toggle-text">
-                  <span className="toggle-title">Accept Instant Trial Meal Requests</span>
-                  <span className="toggle-subtitle">
-                    Allow students to request single trial lunches with 1-click confirmation.
-                  </span>
-                </div>
-                <input
-                  type="checkbox"
-                  checked={instantBookingEnabled}
-                  onChange={(e) => setInstantBookingEnabled(e.target.checked)}
                   className="switch-checkbox"
                 />
               </label>

@@ -269,7 +269,7 @@ export const ReviewsComplaints: React.FC<ReviewsComplaintsProps> = ({
                       onClick={() => onOpenComplaint(c)}
                       className="btn btn-outline btn-sm"
                     >
-                      <Eye size={14} /> Investigate Docket
+                      <Eye size={14} /> Investigate Issue
                     </button>
 
                     {c.status !== 'Resolved' && (

@@ -25,7 +25,7 @@ export const HelpContactPage: React.FC = () => {
   const [contactData, setContactData] = useState({
     name: user?.name || 'Rahul Patil',
     email: user?.email || 'rahul.patil@coep.ac.in',
-    category: 'Subscription Inquiry',
+    category: 'Mess Menu & Food Inquiry',
     messName: 'Annapurna Executive Mess',
     message: ''
   });
@@ -229,8 +229,7 @@ export const HelpContactPage: React.FC = () => {
                 value={contactData.category}
                 onChange={(e) => setContactData({ ...contactData, category: e.target.value })}
               >
-                <option value="Subscription Inquiry">Subscription & QR Pass Inquiry</option>
-                <option value="Meal Pause / Refund">Meal Pause / Billing Adjustment</option>
+                <option value="Mess Menu & Food Inquiry">Mess Menu & Food Inquiry</option>
                 <option value="Food Quality / Hygiene Report">Food Quality or Cleanliness Grievance</option>
                 <option value="Hostel Delivery Issue">Hostel Tiffin Delivery Issue</option>
                 <option value="General Suggestion">Platform Suggestion</option>

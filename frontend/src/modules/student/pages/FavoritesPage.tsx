@@ -8,7 +8,6 @@ import {
 } from 'lucide-react';
 import { mockMesses } from '../../../data/mockMesses';
 import { MessCard } from '../components/MessCard';
-import { PlanModal } from '../components/PlanModal';
 import { EmptyState } from '../../../components/ui/EmptyState';
 import { useFavorites } from '../../../context/FavoritesContext';
 import { useNotification } from '../../../context/NotificationContext';
@@ -19,7 +18,6 @@ export const FavoritesPage: React.FC = () => {
   const { favorites, removeFavorite } = useFavorites();
   const { showToast } = useNotification();
   const [showCompare, setShowCompare] = useState(false);
-  const [selectedMessForPlan, setSelectedMessForPlan] = useState<MessItem | null>(null);
 
   const favoriteMesses = (mockMesses as unknown as MessItem[]).filter((m) => favorites.includes(m.id));
 
@@ -160,19 +158,9 @@ export const FavoritesPage: React.FC = () => {
             <MessCard
               key={mess.id}
               mess={mess}
-              onSubscribeClick={(m) => setSelectedMessForPlan(m)}
             />
           ))}
         </div>
-      )}
-
-      {/* Plan Modal */}
-      {selectedMessForPlan && (
-        <PlanModal
-          mess={selectedMessForPlan}
-          isOpen={!!selectedMessForPlan}
-          onClose={() => setSelectedMessForPlan(null)}
-        />
       )}
     </div>
   );

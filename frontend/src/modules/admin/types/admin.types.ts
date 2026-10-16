@@ -1,4 +1,4 @@
-export type MessStatus = 'Approved' | 'Pending' | 'Rejected' | 'Under Review';
+export type MessStatus = 'Approved' | 'Pending' | 'Rejected' | 'Under Review' | 'Suspended';
 export type FoodType = 'Pure Veg' | 'Veg & Non-Veg' | 'Jain Friendly';
 export type OperatingStatus = 'Open' | 'Closed' | 'Temporary Closure';
 
@@ -99,7 +99,7 @@ export interface Complaint {
 
 export interface ActivityItem {
   id: string;
-  type: 'mess_registered' | 'mess_approved' | 'mess_rejected' | 'complaint_filed' | 'complaint_resolved' | 'user_flagged' | 'review_reported';
+  type: 'mess_registered' | 'mess_approved' | 'mess_rejected' | 'mess_suspended' | 'mess_unsuspended' | 'mess_deleted' | 'complaint_filed' | 'complaint_resolved' | 'user_flagged' | 'review_reported';
   title: string;
   description: string;
   timestamp: string;

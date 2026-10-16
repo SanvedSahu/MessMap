@@ -31,6 +31,8 @@ interface MessDataContextType {
   approveMess: (id: string) => void;
   rejectMess: (id: string, reason?: string) => void;
   suspendMess: (id: string) => void;
+  unsuspendMess: (id: string) => void;
+  deleteMess: (id: string) => void;
   registerMess: (messData: Partial<Mess>) => string;
   updateMess: (id: string, messData: Partial<Mess>) => void;
 }
@@ -136,9 +138,52 @@ export const MessDataProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   };
 
   const suspendMess = (id: string) => {
+    const target = messes.find((m) => m.id === id);
     setMesses((prev) =>
-      prev.map((m) => (m.id === id ? { ...m, status: 'Under Review', operatingStatus: 'Closed' } : m))
+      prev.map((m) => (m.id === id ? { ...m, status: 'Suspended', operatingStatus: 'Closed' } : m))
     );
+
+    const newActivity: ActivityItem = {
+      id: `ACT-${Date.now()}`,
+      type: 'mess_suspended',
+      title: 'Mess Suspended',
+      description: `${target?.name || 'Mess'} listing suspended and temporarily hidden from student portal.`,
+      timestamp: 'Just now',
+      badgeVariant: 'danger',
+    };
+    setActivities((prev) => [newActivity, ...prev]);
+  };
+
+  const unsuspendMess = (id: string) => {
+    const target = messes.find((m) => m.id === id);
+    setMesses((prev) =>
+      prev.map((m) => (m.id === id ? { ...m, status: 'Approved', operatingStatus: 'Open' } : m))
+    );
+
+    const newActivity: ActivityItem = {
+      id: `ACT-${Date.now()}`,
+      type: 'mess_unsuspended',
+      title: 'Mess Unsuspended & Reactivated',
+      description: `${target?.name || 'Mess'} has been unsuspended and reinstated in campus search.`,
+      timestamp: 'Just now',
+      badgeVariant: 'success',
+    };
+    setActivities((prev) => [newActivity, ...prev]);
+  };
+
+  const deleteMess = (id: string) => {
+    const target = messes.find((m) => m.id === id);
+    setMesses((prev) => prev.filter((m) => m.id !== id));
+
+    const newActivity: ActivityItem = {
+      id: `ACT-${Date.now()}`,
+      type: 'mess_deleted',
+      title: 'Mess Removed from Directory',
+      description: `${target?.name || 'Mess'} was removed from the active mess registry.`,
+      timestamp: 'Just now',
+      badgeVariant: 'danger',
+    };
+    setActivities((prev) => [newActivity, ...prev]);
   };
 
   const registerMess = (messData: Partial<Mess>): string => {
@@ -208,6 +253,8 @@ export const MessDataProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         approveMess,
         rejectMess,
         suspendMess,
+        unsuspendMess,
+        deleteMess,
         registerMess,
         updateMess,
       }}

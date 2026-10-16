@@ -15,7 +15,6 @@ import { mockMesses } from '../../../data/mockMesses';
 import { mockReviews } from '../../../data/mockReviews';
 import { useMessData } from '../../../context/MessDataContext';
 import { FoodBadge, StatusBadge } from '../../../components/ui/Badge';
-import { PlanModal } from '../components/PlanModal';
 import { MessMapView } from '../components/MessMapView';
 import { useFavorites } from '../../../context/FavoritesContext';
 import { useNotification } from '../../../context/NotificationContext';
@@ -34,7 +33,6 @@ export const MessDetailsPage: React.FC = () => {
 
   const [activePhoto, setActivePhoto] = useState<string>(mess.heroImage);
   const [activeTab, setActiveTab] = useState<'menu' | 'plans' | 'timings' | 'reviews'>('menu');
-  const [isPlanModalOpen, setIsPlanModalOpen] = useState<boolean>(false);
 
   const messReviews = (mockReviews as unknown as ReviewItem[]).filter((r) => r.messId === mess.id);
 
@@ -540,13 +538,20 @@ export const MessDetailsPage: React.FC = () => {
                     >
                       ₹{plan.price}
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => setIsPlanModalOpen(true)}
-                      className="btn btn-primary btn-sm"
+                    <span
+                      style={{
+                        display: 'inline-block',
+                        fontSize: '0.75rem',
+                        fontWeight: 700,
+                        color: 'var(--primary-dark)',
+                        background: 'var(--primary-light)',
+                        border: '1px solid var(--success-border)',
+                        padding: '4px 10px',
+                        borderRadius: 'var(--radius-full)',
+                      }}
                     >
-                      Subscribe Pass
-                    </button>
+                      Dine-in / Counter Rate
+                    </span>
                   </div>
                 </div>
               ))}
@@ -737,34 +742,50 @@ export const MessDetailsPage: React.FC = () => {
                 marginBottom: '1.5rem',
               }}
             >
-              <button
-                type="button"
-                onClick={() => setIsPlanModalOpen(true)}
+              <a
+                href={`tel:${mess.phone}`}
                 className="btn btn-primary btn-lg"
-                style={{ width: '100%' }}
+                style={{
+                  width: '100%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  textDecoration: 'none',
+                }}
               >
-                Subscribe Now • ₹{mess.monthlyPrice}
-              </button>
-              <button
-                type="button"
-                onClick={() => setIsPlanModalOpen(true)}
+                <Phone size={18} /> Call Mess for Admission
+              </a>
+              <a
+                href={`https://wa.me/91${mess.phone.replace(/[^0-9]/g, '')}?text=Hi%2C%20I%20am%20interested%20in%20dining%20at%20${encodeURIComponent(mess.name)}`}
+                target="_blank"
+                rel="noopener noreferrer"
                 className="btn btn-outline"
-                style={{ width: '100%' }}
+                style={{
+                  width: '100%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  textDecoration: 'none',
+                }}
               >
-                Try Single Day Thali (₹{mess.dailyPrice})
-              </button>
+                <MessageCircle size={18} /> Chat on WhatsApp
+              </a>
             </div>
 
             <div
               style={{
-                fontSize: '0.75rem',
+                fontSize: '0.78rem',
                 color: 'var(--text-muted)',
                 textAlign: 'center',
                 borderTop: '1px solid var(--border-color)',
                 paddingTop: '0.75rem',
+                lineHeight: 1.5,
               }}
             >
-              🛡️ Instant QR pass generation • Free meal pause included
+              🍽️ <strong>Single Meal Thali:</strong> ₹{mess.dailyPrice} (Pay at counter)<br />
+              📅 <strong>Monthly Student Rate:</strong> ₹{mess.monthlyPrice}/mo
             </div>
           </div>
 
@@ -832,15 +853,6 @@ export const MessDetailsPage: React.FC = () => {
           </div>
         </div>
       </div>
-
-      {/* Plan Modal */}
-      {isPlanModalOpen && (
-        <PlanModal
-          mess={mess}
-          isOpen={isPlanModalOpen}
-          onClose={() => setIsPlanModalOpen(false)}
-        />
-      )}
     </div>
   );
 };

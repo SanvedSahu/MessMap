@@ -116,7 +116,7 @@ export const PendingApprovalPage: React.FC = () => {
         <p style={{ fontSize: '0.95rem', color: 'var(--text-muted)', lineHeight: 1.6, marginBottom: '2rem' }}>
           {isRejected ? (
             <span>
-              Your registration dossier did not meet campus health verification criteria.{' '}
+              Your registration application did not meet campus health verification criteria.{' '}
               <strong>Reason: {currentMess.rejectionReason || 'Incomplete licensing documents.'}</strong>
             </span>
           ) : (

@@ -1,9 +1,8 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Menu, MapPin, Heart, CreditCard } from 'lucide-react';
+import { Menu, MapPin, Heart } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useFavorites } from '../../context/FavoritesContext';
-import { useSubscription } from '../../context/SubscriptionContext';
 
 export interface NavbarProps {
   onToggleSidebar?: () => void;
@@ -12,7 +11,6 @@ export interface NavbarProps {
 export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
   const { user, isAuthenticated } = useAuth();
   const { favorites } = useFavorites();
-  const { subscription } = useSubscription();
   const navigate = useNavigate();
 
   return (
@@ -85,21 +83,6 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
             </span>
           )}
         </Link>
-
-        {/* Active subscription pass button */}
-        {subscription?.status === 'Active' && (
-          <Link
-            to="/subscriptions"
-            className="btn btn-outline-primary btn-sm"
-            style={{ fontWeight: 700 }}
-            title="View digital meal pass"
-          >
-            <CreditCard size={15} />
-            <span style={{ display: 'none' }} className="d-sm-inline">
-              Pass Active
-            </span>
-          </Link>
-        )}
 
         {/* User Profile / Login Link */}
         {isAuthenticated ? (

@@ -2,32 +2,28 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Compass,
-  QrCode,
   UtensilsCrossed,
   Sparkles,
   MapPin,
   ArrowRight,
-  Calendar,
   Flame,
+  Clock,
+  Star,
+  CheckCircle2,
+  ChefHat,
+  Coffee,
 } from 'lucide-react';
 import { mockMesses } from '../../../data/mockMesses';
 import { useMessData } from '../../../context/MessDataContext';
 import { MessCard } from '../components/MessCard';
-import { PlanModal } from '../components/PlanModal';
-import { QRModal } from '../components/QRModal';
 import { useAuth } from '../../../context/AuthContext';
-import { useSubscription } from '../../../context/SubscriptionContext';
 import { useFavorites } from '../../../context/FavoritesContext';
-import { MessItem, UserSubscription } from '../../../types/student.types';
+import { MessItem } from '../../../types/student.types';
 
 export const StudentDashboardPage: React.FC = () => {
   const { user } = useAuth();
-  const { subscription } = useSubscription();
   const { favorites } = useFavorites();
   const { approvedMesses } = useMessData();
-
-  const [selectedMessForPlan, setSelectedMessForPlan] = useState<MessItem | null>(null);
-  const [isQRModalOpen, setIsQRModalOpen] = useState<boolean>(false);
 
   // Live approved messes with fallback
   const liveMesses: MessItem[] = (approvedMesses && approvedMesses.length > 0
@@ -83,7 +79,7 @@ export const StudentDashboardPage: React.FC = () => {
             }}
           >
             Lunch is currently being served across campus messes. Explore hot phulkas, compare
-            monthly student plans, or manage your active meal pass.
+            daily thali prices, check hygiene ratings, and find your favorite food spots near campus.
           </p>
 
           {/* Quick Action Buttons */}
@@ -100,20 +96,6 @@ export const StudentDashboardPage: React.FC = () => {
             >
               <Compass size={18} /> Find Nearby Messes
             </Link>
-            {subscription && (
-              <button
-                type="button"
-                onClick={() => setIsQRModalOpen(true)}
-                className="btn btn-outline"
-                style={{
-                  background: 'rgba(255,255,255,0.12)',
-                  borderColor: 'rgba(255,255,255,0.3)',
-                  color: '#ffffff',
-                }}
-              >
-                <QrCode size={18} /> Show QR Meal Token
-              </button>
-            )}
             <Link
               to="/menu-pricing"
               className="btn btn-outline"
@@ -123,13 +105,24 @@ export const StudentDashboardPage: React.FC = () => {
                 color: '#ffffff',
               }}
             >
-              <UtensilsCrossed size={18} /> Today's Menus
+              <UtensilsCrossed size={18} /> Today's Menus & Pricing
+            </Link>
+            <Link
+              to="/reviews"
+              className="btn btn-outline"
+              style={{
+                background: 'rgba(255,255,255,0.12)',
+                borderColor: 'rgba(255,255,255,0.3)',
+                color: '#ffffff',
+              }}
+            >
+              <Star size={18} /> Student Reviews
             </Link>
           </div>
         </div>
       </div>
 
-      {/* 2. STATS & ACTIVE SUBSCRIPTION BAR */}
+      {/* 2. CAMPUS DINING SCHEDULE & QUICK STATS */}
       <div
         style={{
           display: 'grid',
@@ -138,7 +131,7 @@ export const StudentDashboardPage: React.FC = () => {
           marginBottom: '2.5rem',
         }}
       >
-        {/* Active Subscription Status Card */}
+        {/* Campus Dining Window Spotlight Card */}
         <div
           className="card"
           style={{
@@ -147,6 +140,7 @@ export const StudentDashboardPage: React.FC = () => {
             flexDirection: 'column',
             justifyContent: 'space-between',
             borderLeft: '4px solid var(--primary)',
+            background: 'var(--bg-card)',
           }}
         >
           <div>
@@ -155,134 +149,157 @@ export const StudentDashboardPage: React.FC = () => {
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'center',
-                marginBottom: '0.75rem',
+                flexWrap: 'wrap',
+                gap: '8px',
+                marginBottom: '1rem',
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ fontSize: '1.2rem' }}>💳</span>
-                <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-main)' }}>
-                  Active Meal Subscription
-                </h3>
+                <span style={{ fontSize: '1.3rem' }}>🍲</span>
+                <div>
+                  <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-main)', margin: 0 }}>
+                    Campus Meal Windows & Daily Kitchen Status
+                  </h3>
+                  <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                    Standard operating timings for student hostels & messes in Pune
+                  </div>
+                </div>
               </div>
               <span
                 className="badge badge-success"
                 style={{
-                  background:
-                    subscription?.status === 'Active'
-                      ? 'var(--primary-light)'
-                      : 'var(--danger-light)',
-                  color:
-                    subscription?.status === 'Active' ? 'var(--primary-dark)' : 'var(--danger)',
-                  border: `1px solid ${
-                    subscription?.status === 'Active' ? 'var(--success-border)' : '#fca5a5'
-                  }`,
+                  background: 'var(--primary-light)',
+                  color: 'var(--primary-dark)',
+                  border: '1px solid var(--success-border)',
+                  fontWeight: 700,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
                 }}
               >
-                ● {subscription?.status || 'No Active Plan'}
+                <span className="pulse-dot" /> Lunch In Service (12:00 – 3:00 PM)
               </span>
             </div>
 
-            {subscription ? (
-              <div>
-                <div
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'flex-start',
-                    flexWrap: 'wrap',
-                    gap: '10px',
-                    marginBottom: '1rem',
-                  }}
-                >
-                  <div>
-                    <h4 style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-main)' }}>
-                      {subscription.messName}
-                    </h4>
-                    <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                      {subscription.planName} • ₹{subscription.planPrice}/month
-                    </p>
-                  </div>
-                  <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Valid Until</div>
-                    <div
-                      style={{
-                        fontSize: '0.95rem',
-                        fontWeight: 800,
-                        color: 'var(--primary-dark)',
-                      }}
-                    >
-                      {subscription.endDate}
-                    </div>
-                  </div>
+            {/* Meal Time Windows Grid */}
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
+                gap: '10px',
+                marginBottom: '1.25rem',
+              }}
+            >
+              {/* Breakfast */}
+              <div
+                style={{
+                  padding: '10px 12px',
+                  borderRadius: 'var(--radius-md)',
+                  background: 'var(--bg-card-subtle)',
+                  border: '1px solid var(--border-color)',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+                  <Coffee size={14} color="var(--text-muted)" />
+                  <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+                    Breakfast
+                  </span>
                 </div>
-
-                {/* Days remaining progress */}
-                <div style={{ marginBottom: '1.25rem' }}>
-                  <div
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      fontSize: '0.78rem',
-                      color: 'var(--text-muted)',
-                      marginBottom: '4px',
-                    }}
-                  >
-                    <span>
-                      Validity Progress ({subscription.daysUsed} / {subscription.totalDays} days)
-                    </span>
-                    <span style={{ fontWeight: 700, color: 'var(--primary-dark)' }}>
-                      {Math.round((subscription.daysUsed / subscription.totalDays) * 100)}%
-                    </span>
-                  </div>
-                  <div
-                    style={{
-                      height: '8px',
-                      background: 'var(--bg-card-subtle)',
-                      borderRadius: '4px',
-                      overflow: 'hidden',
-                    }}
-                  >
-                    <div
-                      style={{
-                        height: '100%',
-                        width: `${Math.round(
-                          (subscription.daysUsed / subscription.totalDays) * 100
-                        )}%`,
-                        background: 'var(--primary)',
-                        borderRadius: '4px',
-                      }}
-                    />
-                  </div>
+                <div style={{ fontSize: '0.88rem', fontWeight: 800, color: 'var(--text-main)' }}>
+                  7:30 – 9:45 AM
                 </div>
-
-                {/* Quick actions for active pass */}
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                  <button
-                    type="button"
-                    onClick={() => setIsQRModalOpen(true)}
-                    className="btn btn-primary btn-sm"
-                  >
-                    <QrCode size={15} /> Show QR Meal Token
-                  </button>
-                  <Link to="/subscriptions" className="btn btn-outline btn-sm">
-                    <Calendar size={15} /> Pause / Manage Meals
-                  </Link>
-                  <Link to={`/mess/${subscription.messId}`} className="btn btn-ghost btn-sm">
-                    Check Today's Menu
-                  </Link>
+                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                  Poha, Upma, Idli & Tea
                 </div>
               </div>
-            ) : (
-              <div style={{ padding: '1.5rem 0', textAlign: 'center' }}>
-                <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
-                  You don't have an active meal subscription yet. Explore nearby messes to activate
-                  student pass.
-                </p>
-                <Link to="/find-mess" className="btn btn-primary btn-sm">
-                  Find a Mess & Subscribe
-                </Link>
+
+              {/* Lunch - Active */}
+              <div
+                style={{
+                  padding: '10px 12px',
+                  borderRadius: 'var(--radius-md)',
+                  background: 'var(--primary-light)',
+                  border: '1.5px solid var(--primary)',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <ChefHat size={14} color="var(--primary-dark)" />
+                    <span style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--primary-dark)', textTransform: 'uppercase' }}>
+                      Lunch
+                    </span>
+                  </div>
+                  <span style={{ fontSize: '0.68rem', fontWeight: 800, color: 'var(--primary-dark)', background: '#ffffff', padding: '1px 6px', borderRadius: '4px' }}>
+                    OPEN NOW
+                  </span>
+                </div>
+                <div style={{ fontSize: '0.88rem', fontWeight: 800, color: 'var(--primary-dark)' }}>
+                  12:00 – 3:00 PM
+                </div>
+                <div style={{ fontSize: '0.72rem', color: 'var(--primary-dark)', fontWeight: 600, marginTop: '2px' }}>
+                  Hot Phulkas & Dal Tadka
+                </div>
               </div>
-            )}
+
+              {/* Snacks */}
+              <div
+                style={{
+                  padding: '10px 12px',
+                  borderRadius: 'var(--radius-md)',
+                  background: 'var(--bg-card-subtle)',
+                  border: '1px solid var(--border-color)',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+                  <Clock size={14} color="var(--text-muted)" />
+                  <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+                    Snacks
+                  </span>
+                </div>
+                <div style={{ fontSize: '0.88rem', fontWeight: 800, color: 'var(--text-main)' }}>
+                  4:30 – 6:30 PM
+                </div>
+                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                  Samosa, Misal & Chai
+                </div>
+              </div>
+
+              {/* Dinner */}
+              <div
+                style={{
+                  padding: '10px 12px',
+                  borderRadius: 'var(--radius-md)',
+                  background: 'var(--bg-card-subtle)',
+                  border: '1px solid var(--border-color)',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+                  <Flame size={14} color="#f97316" />
+                  <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+                    Dinner
+                  </span>
+                </div>
+                <div style={{ fontSize: '0.88rem', fontWeight: 800, color: 'var(--text-main)' }}>
+                  7:30 – 10:15 PM
+                </div>
+                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                  Paneer Bhurji / Feast Thali
+                </div>
+              </div>
+            </div>
+
+            {/* Quick Actions */}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+              <Link to="/find-mess" className="btn btn-primary btn-sm">
+                <Compass size={15} /> Discover Open Messes
+              </Link>
+              <Link to="/menu-pricing" className="btn btn-outline btn-sm">
+                <UtensilsCrossed size={15} /> View Full Meal Schedules
+              </Link>
+              <Link to="/reviews" className="btn btn-ghost btn-sm">
+                <Star size={15} /> Student Ratings
+              </Link>
+            </div>
           </div>
         </div>
 
@@ -432,7 +449,6 @@ export const StudentDashboardPage: React.FC = () => {
             <MessCard
               key={mess.id}
               mess={mess}
-              onSubscribeClick={(m) => setSelectedMessForPlan(m)}
             />
           ))}
         </div>
@@ -486,7 +502,6 @@ export const StudentDashboardPage: React.FC = () => {
             <MessCard
               key={mess.id}
               mess={mess}
-              onSubscribeClick={(m) => setSelectedMessForPlan(m)}
             />
           ))}
         </div>
@@ -529,24 +544,6 @@ export const StudentDashboardPage: React.FC = () => {
           <UtensilsCrossed size={16} /> Explore Weekly Menus & Pricing
         </Link>
       </div>
-
-      {/* Subscription Modal */}
-      {selectedMessForPlan && (
-        <PlanModal
-          mess={selectedMessForPlan}
-          isOpen={!!selectedMessForPlan}
-          onClose={() => setSelectedMessForPlan(null)}
-        />
-      )}
-
-      {/* QR Code Modal */}
-      {subscription && (
-        <QRModal
-          subscription={subscription as unknown as UserSubscription}
-          isOpen={isQRModalOpen}
-          onClose={() => setIsQRModalOpen(false)}
-        />
-      )}
     </div>
   );
 };

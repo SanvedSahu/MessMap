@@ -115,47 +115,130 @@ const initialMenuItems: MenuItem[] = [
 
 export const MenuPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'all' | 'breakfast' | 'lunch' | 'snacks' | 'dinner'>('lunch');
-  const [menuItems, setMenuItems] = useState<MenuItem[]>(initialMenuItems);
+  const [menuItems, setMenuItems] = useState<MenuItem[]>(() => {
+    try {
+      const saved = localStorage.getItem('messmap_owner_menu_items');
+      if (saved) return JSON.parse(saved);
+    } catch {
+      // fallback
+    }
+    return initialMenuItems;
+  });
   const [searchQuery, setSearchQuery] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingDish, setEditingDish] = useState<MenuItem | null>(null);
+  const [successToast, setSuccessToast] = useState<string | null>(null);
 
-  // Form states for new dish
-  const [newItemName, setNewItemName] = useState('');
-  const [newItemDesc, setNewItemDesc] = useState('');
-  const [newItemMeal, setNewItemMeal] = useState<'breakfast' | 'lunch' | 'snacks' | 'dinner'>('lunch');
-  const [newItemPrice, setNewItemPrice] = useState(80);
-  const [newItemDiet, setNewItemDiet] = useState<'veg' | 'non-veg'>('veg');
+  // Form states
+  const [dishName, setDishName] = useState('');
+  const [dishDesc, setDishDesc] = useState('');
+  const [dishMeal, setDishMeal] = useState<'breakfast' | 'lunch' | 'snacks' | 'dinner'>('lunch');
+  const [dishPrice, setDishPrice] = useState(80);
+  const [dishDiet, setDishDiet] = useState<'veg' | 'non-veg'>('veg');
+  const [dishIsSpecial, setDishIsSpecial] = useState(false);
 
-  const toggleAvailability = (id: string) => {
-    setMenuItems((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, isAvailable: !item.isAvailable } : item))
-    );
-  };
-
-  const deleteItem = (id: string) => {
-    if (window.confirm('Are you sure you want to remove this dish from the menu?')) {
-      setMenuItems((prev) => prev.filter((item) => item.id !== id));
+  const saveToStorage = (items: MenuItem[]) => {
+    try {
+      localStorage.setItem('messmap_owner_menu_items', JSON.stringify(items));
+    } catch {
+      // ignore
     }
   };
 
-  const handleAddDish = (e: React.FormEvent) => {
+  const showToast = (msg: string) => {
+    setSuccessToast(msg);
+    setTimeout(() => setSuccessToast(null), 3000);
+  };
+
+  const toggleAvailability = (id: string) => {
+    setMenuItems((prev) => {
+      const updated = prev.map((item) =>
+        item.id === id ? { ...item, isAvailable: !item.isAvailable } : item
+      );
+      saveToStorage(updated);
+      return updated;
+    });
+  };
+
+  const deleteItem = (id: string) => {
+    const target = menuItems.find((i) => i.id === id);
+    if (window.confirm(`Are you sure you want to remove "${target?.name || 'this dish'}" from the menu?`)) {
+      setMenuItems((prev) => {
+        const updated = prev.filter((item) => item.id !== id);
+        saveToStorage(updated);
+        return updated;
+      });
+      showToast('Dish removed from menu.');
+    }
+  };
+
+  const handleOpenAdd = () => {
+    setEditingDish(null);
+    setDishName('');
+    setDishDesc('');
+    setDishMeal(activeTab === 'all' ? 'lunch' : activeTab);
+    setDishPrice(80);
+    setDishDiet('veg');
+    setDishIsSpecial(false);
+    setIsModalOpen(true);
+  };
+
+  const handleOpenEdit = (item: MenuItem) => {
+    setEditingDish(item);
+    setDishName(item.name);
+    setDishDesc(item.description);
+    setDishMeal(item.mealType);
+    setDishPrice(item.price);
+    setDishDiet(item.dietType);
+    setDishIsSpecial(!!item.isSpecial);
+    setIsModalOpen(true);
+  };
+
+  const handleSaveDish = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newItemName.trim()) return;
+    if (!dishName.trim()) return;
 
-    const newItem: MenuItem = {
-      id: `m_${Date.now()}`,
-      name: newItemName.trim(),
-      description: newItemDesc.trim() || 'Prepared fresh daily with finest ingredients.',
-      mealType: newItemMeal,
-      price: Number(newItemPrice),
-      dietType: newItemDiet,
-      isAvailable: true,
-    };
+    if (editingDish) {
+      // Update existing
+      setMenuItems((prev) => {
+        const updated = prev.map((item) =>
+          item.id === editingDish.id
+            ? {
+                ...item,
+                name: dishName.trim(),
+                description: dishDesc.trim() || 'Prepared fresh daily with finest ingredients.',
+                mealType: dishMeal,
+                price: Number(dishPrice),
+                dietType: dishDiet,
+                isSpecial: dishIsSpecial,
+              }
+            : item
+        );
+        saveToStorage(updated);
+        return updated;
+      });
+      showToast(`Updated "${dishName.trim()}" successfully! 🍲`);
+    } else {
+      // Add new
+      const newItem: MenuItem = {
+        id: `m_${Date.now()}`,
+        name: dishName.trim(),
+        description: dishDesc.trim() || 'Prepared fresh daily with finest ingredients.',
+        mealType: dishMeal,
+        price: Number(dishPrice),
+        dietType: dishDiet,
+        isAvailable: true,
+        isSpecial: dishIsSpecial,
+      };
+      setMenuItems((prev) => {
+        const updated = [newItem, ...prev];
+        saveToStorage(updated);
+        return updated;
+      });
+      showToast(`Added "${newItem.name}" to the menu! ✨`);
+    }
 
-    setMenuItems((prev) => [newItem, ...prev]);
     setIsModalOpen(false);
-    setNewItemName('');
-    setNewItemDesc('');
   };
 
   const filteredItems = menuItems.filter((item) => {
@@ -168,6 +251,26 @@ export const MenuPage: React.FC = () => {
 
   return (
     <div className="menu-page-container">
+      {/* Toast Alert */}
+      {successToast && (
+        <div style={{
+          backgroundColor: '#ecfdf5',
+          border: '1px solid #a7f3d0',
+          color: '#065f46',
+          padding: '0.75rem 1.25rem',
+          borderRadius: 'var(--radius-md)',
+          marginBottom: '1rem',
+          fontWeight: 700,
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          boxShadow: 'var(--shadow-sm)',
+        }}>
+          <CheckCircle2 size={18} color="#059669" />
+          <span>{successToast}</span>
+        </div>
+      )}
+
       {/* Top Banner and Actions */}
       <div className="menu-header-bar">
         <div>
@@ -177,7 +280,7 @@ export const MenuPage: React.FC = () => {
           </p>
         </div>
 
-        <button className="btn btn-primary" onClick={() => setIsModalOpen(true)}>
+        <button className="btn btn-primary" onClick={handleOpenAdd}>
           <Plus size={18} /> Add New Dish
         </button>
       </div>
@@ -285,7 +388,7 @@ export const MenuPage: React.FC = () => {
                 <button
                   className="icon-action"
                   title="Edit Dish"
-                  onClick={() => alert(`Edit ${item.name}`)}
+                  onClick={() => handleOpenEdit(item)}
                 >
                   <Edit2 size={15} />
                 </button>
@@ -306,33 +409,35 @@ export const MenuPage: React.FC = () => {
             <UtensilsCrossed size={48} className="empty-icon" />
             <h3>No menu items found</h3>
             <p>Try searching with another keyword or click below to add a new dish.</p>
-            <button className="btn btn-primary" onClick={() => setIsModalOpen(true)}>
+            <button className="btn btn-primary" onClick={handleOpenAdd}>
               <Plus size={16} /> Add Dish
             </button>
           </div>
         )}
       </div>
 
-      {/* Add Dish Modal */}
+      {/* Add / Edit Dish Modal */}
       {isModalOpen && (
         <div className="modal-backdrop">
           <div className="modal-card">
             <div className="modal-header">
-              <h3 className="modal-title">Add New Dish to Menu</h3>
+              <h3 className="modal-title">
+                {editingDish ? `Edit "${editingDish.name}"` : 'Add New Dish to Menu'}
+              </h3>
               <button className="modal-close-btn" onClick={() => setIsModalOpen(false)}>
                 <X size={20} />
               </button>
             </div>
 
-            <form onSubmit={handleAddDish} className="modal-form">
+            <form onSubmit={handleSaveDish} className="modal-form">
               <div className="form-group">
                 <label className="form-label">Dish Name *</label>
                 <input
                   type="text"
                   required
                   placeholder="e.g. Shahi Paneer, Veg Biryani"
-                  value={newItemName}
-                  onChange={(e) => setNewItemName(e.target.value)}
+                  value={dishName}
+                  onChange={(e) => setDishName(e.target.value)}
                   className="form-input"
                 />
               </div>
@@ -342,8 +447,8 @@ export const MenuPage: React.FC = () => {
                 <textarea
                   rows={3}
                   placeholder="Ingredients, preparation, side dishes..."
-                  value={newItemDesc}
-                  onChange={(e) => setNewItemDesc(e.target.value)}
+                  value={dishDesc}
+                  onChange={(e) => setDishDesc(e.target.value)}
                   className="form-input"
                 />
               </div>
@@ -352,8 +457,8 @@ export const MenuPage: React.FC = () => {
                 <div className="form-group">
                   <label className="form-label">Meal Category *</label>
                   <select
-                    value={newItemMeal}
-                    onChange={(e) => setNewItemMeal(e.target.value as any)}
+                    value={dishMeal}
+                    onChange={(e) => setDishMeal(e.target.value as any)}
                     className="form-input"
                   >
                     <option value="breakfast">Breakfast</option>
@@ -366,8 +471,8 @@ export const MenuPage: React.FC = () => {
                 <div className="form-group">
                   <label className="form-label">Dietary Type *</label>
                   <select
-                    value={newItemDiet}
-                    onChange={(e) => setNewItemDiet(e.target.value as any)}
+                    value={dishDiet}
+                    onChange={(e) => setDishDiet(e.target.value as any)}
                     className="form-input"
                   >
                     <option value="veg">Pure Veg</option>
@@ -382,10 +487,22 @@ export const MenuPage: React.FC = () => {
                   type="number"
                   required
                   min={10}
-                  value={newItemPrice}
-                  onChange={(e) => setNewItemPrice(Number(e.target.value))}
+                  value={dishPrice}
+                  onChange={(e) => setDishPrice(Number(e.target.value))}
                   className="form-input"
                 />
+              </div>
+
+              <div className="form-group" style={{ marginTop: '0.5rem' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.88rem', fontWeight: 600 }}>
+                  <input
+                    type="checkbox"
+                    checked={dishIsSpecial}
+                    onChange={(e) => setDishIsSpecial(e.target.checked)}
+                    style={{ width: '16px', height: '16px', accentColor: 'var(--primary)' }}
+                  />
+                  <span>🌟 Highlight as Today's Special Dish</span>
+                </label>
               </div>
 
               <div className="modal-actions">
@@ -397,7 +514,7 @@ export const MenuPage: React.FC = () => {
                   Cancel
                 </button>
                 <button type="submit" className="btn btn-primary">
-                  Save Dish
+                  {editingDish ? 'Update Dish' : 'Save Dish'}
                 </button>
               </div>
             </form>
