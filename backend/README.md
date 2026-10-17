@@ -6,7 +6,7 @@ Backend service for **MessMap**, the campus mess discovery and meal subscription
 
 ## 🛠️ Technology Stack
 
-- **Java:** 17 LTS (Compatible with Java 17 and 21)
+- **Java:** 17 LTS (Required project baseline for build and CI consistency)
 - **Framework:** Spring Boot 3.3.4
 - **Build Tool:** Maven 3.9+ (includes Maven Wrapper `./mvnw`)
 - **Database:** MySQL 8.x
@@ -29,7 +29,7 @@ All sensitive credentials and environment-dependent options are loaded from envi
 | `SPRING_PROFILES_ACTIVE` | `dev` | Active Spring profile (`dev`, `prod`, `h2`, `test`) |
 | `MYSQL_HOST` | `localhost` | MySQL host address |
 | `MYSQL_PORT` | `3306` | MySQL port |
-| `MYSQL_DATABASE` | `messmap_db` | MySQL database name |
+| `MYSQL_DATABASE` | `messmap_dev_db` | MySQL database name |
 | `MYSQL_USER` | `messmap_user` | MySQL database username |
 | `MYSQL_PASSWORD` | `messmap_secret_password` | MySQL database password |
 | `MYSQL_ROOT_PASSWORD` | `messmap_root_password` | MySQL root administrative password |
@@ -50,16 +50,16 @@ From the root of the repository:
 docker compose -f database/docker-compose-db.yml up -d
 ```
 
-This starts a containerized MySQL 8 instance with persistent data storage and creates the `messmap_db` database with the user `messmap_user`.
+This starts a containerized MySQL 8 instance with persistent data storage and creates the `messmap_dev_db` database with the user `messmap_user`.
 
 ### 2. Manual MySQL Setup
 
 If using a local native MySQL installation:
 
 ```sql
-CREATE DATABASE messmap_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE DATABASE messmap_dev_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 CREATE USER 'messmap_user'@'localhost' IDENTIFIED BY 'messmap_secret_password';
-GRANT ALL PRIVILEGES ON messmap_db.* TO 'messmap_user'@'localhost';
+GRANT ALL PRIVILEGES ON messmap_dev_db.* TO 'messmap_user'@'localhost';
 FLUSH PRIVILEGES;
 ```
 
@@ -76,8 +76,39 @@ Database schema versioning is managed via **Flyway**.
 ## 🚀 Building & Running
 
 ### Prerequisites
-- JDK 17 or JDK 21 installed.
-- Ensure `JAVA_HOME` points to your JDK 17 or 21 installation (e.g. `export JAVA_HOME=$(/usr/libexec/java_home -v 21)` on macOS).
+- **JDK 17 LTS installed** (e.g. Eclipse Temurin 17 or OpenJDK 17).
+  - *Note:* Developers can retain JDK 21 or other versions on their system (e.g. for coursework or other projects) without making Java 17 the system-wide default.
+  - JDK 17 must be installed locally before configuring the terminal session.
+
+#### macOS: Terminal JDK Selection
+On macOS, if JDK 17 is not installed, `/usr/libexec/java_home -v 17` silently falls back to other installed versions (such as Java 21 or 25). Use this safe check to verify that JDK 17 is actually installed and selected before running Maven:
+
+```bash
+# 1. Check and select JDK 17 for this terminal session
+JAVA_CANDIDATE=$(/usr/libexec/java_home -v 17 2>/dev/null)
+if [ -n "$JAVA_CANDIDATE" ] && "$JAVA_CANDIDATE/bin/java" -version 2>&1 | grep -q '"17\.' ; then
+    export JAVA_HOME="$JAVA_CANDIDATE"
+    export PATH="$JAVA_HOME/bin:$PATH"
+    echo "Using JDK 17: $JAVA_HOME"
+else
+    echo "Error: JDK 17 is not installed on this system."
+    echo "Install JDK 17 (e.g. 'brew install openjdk@17' or from https://adoptium.net/) before building MessMap."
+    return 1 2>/dev/null || exit 1
+fi
+
+# 2. Verify Maven Wrapper uses JDK 17 (do not rely on 'java -version' alone)
+./mvnw -version
+```
+
+> **Important:** Running `java -version` only checks what is first in your shell's `PATH`. The Maven Wrapper (`./mvnw`) prioritizes `$JAVA_HOME`. Always run `./mvnw -version` inside `backend/` to verify the actual Java runtime Maven uses.
+
+For Java 21 coursework in a separate terminal:
+```bash
+export JAVA_HOME=$(/usr/libexec/java_home -v 21)
+export PATH="$JAVA_HOME/bin:$PATH"
+
+java -version
+```
 
 ### 1. Build & Package
 ```bash

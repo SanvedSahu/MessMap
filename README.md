@@ -48,7 +48,7 @@ MessMap/
 │       ├── main.tsx                      # React DOM render entry point
 │       └── index.css                     # Design system CSS variables and utilities
 │
-├── backend/                              # Application Layer (Java 17/21 + Spring Boot 3.x)
+├── backend/                              # Application Layer (Java 17 LTS + Spring Boot 3.x)
 │   ├── mvnw / mvnw.cmd                   # Maven wrapper executables
 │   ├── pom.xml                           # Maven dependencies & build configuration
 │   └── src/
@@ -97,7 +97,7 @@ MessMap/
 | Layer | Technologies |
 | :--- | :--- |
 | **Frontend** | React 18, TypeScript 5, Vite 6, React Router DOM 6, React-Leaflet, Lucide Icons, Vanilla CSS |
-| **Backend** | Java 17/21, Spring Boot 3.x, Spring Data JPA, Hibernate, Spring Security, JJWT, Maven |
+| **Backend** | Java 17 LTS, Spring Boot 3.x, Spring Data JPA, Hibernate, Spring Security, JJWT, Maven |
 | **Database** | MySQL 8.x, Flyway Database Migrations |
 | **DevOps & CI/CD** | GitHub Actions, Docker, Docker Compose |
 | **Documentation** | Markdown, Mermaid Diagrams, OpenAPI 3.0 / Swagger UI |
@@ -108,7 +108,7 @@ MessMap/
 
 ### 1. Prerequisites
 - **Node.js** (v18 or v20 LTS recommended) — [Download](https://nodejs.org/)
-- **Java Development Kit (JDK 17 or 21)** — [Eclipse Temurin](https://adoptium.net/)
+- **Java Development Kit (JDK 17 LTS)** — [Eclipse Temurin](https://adoptium.net/) (MessMap targets Java 17 LTS; developers may retain JDK 21 for coursework and switch per terminal session)
 - **Git** — [Download](https://git-scm.com/)
 - **Docker Desktop** (Optional, for running MySQL and containerized services) — [Download](https://www.docker.com/)
 
@@ -138,11 +138,29 @@ npm run build
 ---
 
 ### 3. Backend Setup & Run
+
+For macOS users, configure your terminal session to use JDK 17 (JDK 17 must be installed first).
+Because `/usr/libexec/java_home -v 17` will silently fall back to other installed versions if 17 is missing, verify the version before proceeding:
 ```bash
-# 1. Navigate to the backend directory
+# 1. Safely check and select JDK 17 for this terminal session
+JAVA_CANDIDATE=$(/usr/libexec/java_home -v 17 2>/dev/null)
+if [ -n "$JAVA_CANDIDATE" ] && "$JAVA_CANDIDATE/bin/java" -version 2>&1 | grep -q '"17\.' ; then
+    export JAVA_HOME="$JAVA_CANDIDATE"
+    export PATH="$JAVA_HOME/bin:$PATH"
+    echo "Using JDK 17: $JAVA_HOME"
+else
+    echo "Error: JDK 17 is not installed on this system."
+    echo "Install JDK 17 (e.g. 'brew install openjdk@17' or from https://adoptium.net/) before building MessMap."
+    return 1 2>/dev/null || exit 1
+fi
+
+# 2. Navigate to the backend directory
 cd backend
 
-# 2. Compile and run using the Maven Wrapper
+# 3. Verify the Java version used by the Maven Wrapper (do not rely on 'java -version' alone)
+./mvnw -version
+
+# 4. Compile and run using the Maven Wrapper
 ./mvnw clean spring-boot:run
 ```
 The backend API starts on **`http://localhost:8080`**.

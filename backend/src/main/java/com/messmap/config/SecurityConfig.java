@@ -46,6 +46,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/messes/public/**").permitAll()
                         // Swagger & OpenAPI documentation
                         .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
+                        // Admin endpoints strictly restricted to ROLE_ADMIN
+                        .requestMatchers("/api/admin/**", "/api/v1/admin/**").hasRole("ADMIN")
                         // Permit remaining endpoints during foundation phase until JWT filter is connected
                         .anyRequest().permitAll()
                 )
