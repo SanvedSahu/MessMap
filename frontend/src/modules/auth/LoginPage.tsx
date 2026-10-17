@@ -51,7 +51,7 @@ export const LoginPage: React.FC = () => {
     setError(null);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
 
@@ -64,7 +64,7 @@ export const LoginPage: React.FC = () => {
       return;
     }
 
-    const result = login(activeRole, email.trim(), password);
+    const result = await login(activeRole, email.trim(), password);
     if (result.success) {
       if (activeRole === 'owner') {
         navigate('/owner/dashboard');

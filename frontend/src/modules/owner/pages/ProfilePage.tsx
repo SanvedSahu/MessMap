@@ -17,6 +17,8 @@ import {
   X,
   Check,
 } from 'lucide-react';
+import { useEffect } from 'react';
+import { getOwnerProfileApi, updateOwnerProfileApi } from '../../../api/ownerApi';
 import './ProfilePage.css';
 
 export const ProfilePage: React.FC = () => {
@@ -38,6 +40,30 @@ export const ProfilePage: React.FC = () => {
   const [ownerName, setOwnerName] = useState(savedProfile?.ownerName || 'Rajesh Sharma');
   const [phone, setPhone] = useState(savedProfile?.phone || '+91 98231 44550');
   const [email, setEmail] = useState(savedProfile?.email || 'contact@annapurnamess.com');
+
+  // Load live owner profile from backend if JWT token exists
+  useEffect(() => {
+    const token = localStorage.getItem('messmap_auth_token');
+    if (token) {
+      getOwnerProfileApi(token)
+        .then((res) => {
+          if (res?.data) {
+            if (res.data.name) setOwnerName(res.data.name);
+            if (res.data.phone) setPhone(res.data.phone);
+            if (res.data.email) setEmail(res.data.email);
+            if (res.data.messes && res.data.messes.length > 0) {
+              const primaryMess = res.data.messes[0];
+              if (primaryMess.name) setMessName(primaryMess.name);
+              if (primaryMess.address) setAddress(primaryMess.address);
+              if (primaryMess.city) setCity(primaryMess.city);
+            }
+          }
+        })
+        .catch((err) => {
+          console.warn('Backend profile fetch note:', err.message);
+        });
+    }
+  }, []);
   const [address, setAddress] = useState(
     savedProfile?.address || 'Shop No. 4 & 5, Near Bharati Vidyapeeth Gate 2, Katraj-Kondhwa Road'
   );
@@ -105,7 +131,7 @@ export const ProfilePage: React.FC = () => {
     setAmenities((prev) => prev.filter((a) => a !== name));
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     const dataToSave = {
       messName,
@@ -125,8 +151,15 @@ export const ProfilePage: React.FC = () => {
     };
     try {
       localStorage.setItem('messmap_owner_profile_data', JSON.stringify(dataToSave));
-    } catch {
-      // ignore
+      const token = localStorage.getItem('messmap_auth_token');
+      if (token) {
+        await updateOwnerProfileApi(token, {
+          name: ownerName,
+          phone,
+        });
+      }
+    } catch (err: any) {
+      console.warn('Backend sync warning:', err.message);
     }
     setIsEditing(false);
     setSaveSuccess(true);
