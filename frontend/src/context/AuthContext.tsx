@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { loginApi, registerOwnerApi } from '../api/authApi';
+import { loginStudentApi, registerStudentApi, DietaryPreference } from '../api/studentApi';
 
 export type UserRole = 'guest' | 'student' | 'owner' | 'admin';
 
@@ -40,7 +41,15 @@ interface AuthContextType {
   isAuthenticated: boolean;
   role: UserRole;
   login: (role: UserRole, email: string, password?: string) => Promise<{ success: boolean; error?: string }>;
-  registerStudent: (data: { name: string; email: string; phone?: string; college?: string }) => void;
+  registerStudent: (data: {
+    name: string;
+    email: string;
+    password?: string;
+    phone?: string;
+    college?: string;
+    hostel?: string;
+    dietaryPreference?: DietaryPreference;
+  }) => Promise<{ success: boolean; error?: string }>;
   registerOwner: (data: { name: string; email: string; password?: string; phone?: string; messName?: string; messId?: string }) => void | Promise<void>;
   updateProfile: (data: Partial<AuthUser>) => void;
   logout: () => void;
@@ -53,10 +62,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<AuthUser>(() => {
     try {
       const saved = localStorage.getItem('messmap_auth_user');
+      const token = localStorage.getItem('messmap_auth_token') || undefined;
       if (saved) {
         const parsed = JSON.parse(saved);
         if (parsed && typeof parsed.isAuthenticated === 'boolean') {
-          return parsed;
+          return { ...parsed, token: token || parsed.token };
         }
       }
     } catch {
@@ -68,6 +78,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     try {
       localStorage.setItem('messmap_auth_user', JSON.stringify(user));
+      if (user.token) {
+        localStorage.setItem('messmap_auth_token', user.token);
+      }
     } catch {
       // ignore
     }
@@ -144,7 +157,40 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return { success: true };
     }
 
-    // Default to student
+    // Student Authentication
+    if (password) {
+      try {
+        const res = await loginStudentApi({ email: trimmedEmail, password });
+        if (res.success && res.data) {
+          const apiUser = res.data.user;
+          const token = res.data.token;
+          const studentUser: AuthUser = {
+            id: String(apiUser.id),
+            name: apiUser.name,
+            email: apiUser.email,
+            phone: apiUser.phone || undefined,
+            role: 'student',
+            college: apiUser.college || apiUser.collegeOrLocality || undefined,
+            hostel: apiUser.hostel || undefined,
+            dietaryPref: apiUser.dietaryPreference || 'VEG',
+            studentId: `STU-${apiUser.id}`,
+            joinedDate: apiUser.createdAt ? new Date(apiUser.createdAt).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : 'Oct 2026',
+            isAuthenticated: true,
+            token,
+            avatar: apiUser.name ? apiUser.name.substring(0, 2).toUpperCase() : 'ST',
+          };
+          localStorage.setItem('messmap_auth_token', token);
+          setUser(studentUser);
+          return { success: true };
+        }
+      } catch (err: any) {
+        if (err.message && !err.message.includes('Failed to fetch')) {
+          return { success: false, error: err.message };
+        }
+      }
+    }
+
+    // Demo fallback for student
     const studentUser: AuthUser = {
       id: 'stu-101',
       name: trimmedEmail.includes('@') ? trimmedEmail.split('@')[0].replace('.', ' ') : 'Student User',
@@ -163,7 +209,57 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return { success: true };
   };
 
-  const registerStudent = (data: { name: string; email: string; phone?: string; college?: string }) => {
+  const registerStudent = async (data: {
+    name: string;
+    email: string;
+    password?: string;
+    phone?: string;
+    college?: string;
+    hostel?: string;
+    dietaryPreference?: DietaryPreference;
+  }): Promise<{ success: boolean; error?: string }> => {
+    if (data.password) {
+      try {
+        const res = await registerStudentApi({
+          name: data.name,
+          email: data.email,
+          password: data.password,
+          phone: data.phone,
+          college: data.college,
+          hostel: data.hostel,
+          dietaryPreference: data.dietaryPreference,
+        });
+
+        if (res.success && res.data) {
+          const apiUser = res.data.user;
+          const token = res.data.token;
+          const studentUser: AuthUser = {
+            id: String(apiUser.id),
+            name: apiUser.name,
+            email: apiUser.email,
+            phone: apiUser.phone || undefined,
+            role: 'student',
+            college: apiUser.college || apiUser.collegeOrLocality || undefined,
+            hostel: apiUser.hostel || undefined,
+            dietaryPref: apiUser.dietaryPreference || 'VEG',
+            studentId: `STU-${apiUser.id}`,
+            joinedDate: apiUser.createdAt ? new Date(apiUser.createdAt).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : 'Oct 2026',
+            isAuthenticated: true,
+            token,
+            avatar: apiUser.name ? apiUser.name.substring(0, 2).toUpperCase() : 'ST',
+          };
+          localStorage.setItem('messmap_auth_token', token);
+          setUser(studentUser);
+          return { success: true };
+        }
+      } catch (err: any) {
+        if (err.message && !err.message.includes('Failed to fetch')) {
+          return { success: false, error: err.message };
+        }
+      }
+    }
+
+    // Local fallback if offline
     const newStudent: AuthUser = {
       id: 'stu-' + Date.now(),
       name: data.name,
@@ -171,14 +267,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       phone: data.phone || '+91 98000 00000',
       role: 'student',
       college: data.college || 'Pune University Campus',
-      hostel: 'Hostel Campus',
-      dietaryPref: 'Pure Veg',
+      hostel: data.hostel || 'Hostel Campus',
+      dietaryPref: data.dietaryPreference || 'VEG',
       studentId: 'PRN-' + Math.floor(100000 + Math.random() * 900000),
       joinedDate: 'Oct 2026',
       isAuthenticated: true,
       avatar: data.name.substring(0, 2).toUpperCase(),
     };
     setUser(newStudent);
+    return { success: true };
   };
 
   const registerOwner = async (data: {

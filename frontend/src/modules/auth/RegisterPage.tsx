@@ -66,8 +66,9 @@ export const RegisterPage: React.FC = () => {
   const [description, setDescription] = useState('');
 
   const [error, setError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
 
@@ -80,8 +81,8 @@ export const RegisterPage: React.FC = () => {
       setError('Please provide a valid email address.');
       return;
     }
-    if (!password || password.length < 4) {
-      setError('Password must be at least 4 characters long.');
+    if (!password || password.length < 6) {
+      setError('Password must be at least 6 characters long.');
       return;
     }
     if (password !== confirmPassword) {
@@ -89,27 +90,34 @@ export const RegisterPage: React.FC = () => {
       return;
     }
 
-    if (activeRole === 'student') {
-      registerStudent({
-        name: fullName.trim(),
-        email: email.trim(),
-        phone: phone.trim(),
-        college: college.trim() || 'Pune College Campus',
-      });
-      navigate('/student/dashboard');
-    } else {
-      // Owner Registration
-      if (!messName.trim()) {
-        setError('Please provide your mess business name.');
-        return;
-      }
-      if (!address.trim()) {
-        setError('Please enter the mess physical address.');
-        return;
-      }
+    setIsSubmitting(true);
+    try {
+      if (activeRole === 'student') {
+        const result = await registerStudent({
+          name: fullName.trim(),
+          email: email.trim(),
+          password,
+          phone: phone.trim(),
+          college: college.trim() || undefined,
+        });
+        if (result.success) {
+          navigate('/student/dashboard');
+        } else {
+          setError(result.error || 'Student registration failed. Please try again.');
+        }
+      } else {
+        // Owner Registration
+        if (!messName.trim()) {
+          setError('Please provide your mess business name.');
+          return;
+        }
+        if (!address.trim()) {
+          setError('Please enter the mess physical address.');
+          return;
+        }
 
-      // 1. Submit Mess Details to Verification Queue (creates with status: 'Pending')
-      const newMessId = registerMess({
+        // 1. Submit Mess Details to Verification Queue (creates with status: 'Pending')
+        const newMessId = registerMess({
         name: messName.trim(),
         ownerName: fullName.trim(),
         ownerEmail: email.trim(),
@@ -143,7 +151,10 @@ export const RegisterPage: React.FC = () => {
         },
       });
     }
-  };
+  } finally {
+    setIsSubmitting(false);
+  }
+};
 
   return (
     <div
@@ -613,12 +624,17 @@ export const RegisterPage: React.FC = () => {
           <button
             type="submit"
             className="btn btn-primary btn-lg"
+            disabled={isSubmitting}
             style={{
               width: '100%',
               backgroundColor: activeRole === 'owner' ? '#d97706' : 'var(--primary)',
+              opacity: isSubmitting ? 0.7 : 1,
+              cursor: isSubmitting ? 'not-allowed' : 'pointer',
             }}
           >
-            {activeRole === 'student' ? 'Complete Registration & Start' : 'Submit Mess for Verification →'}
+            {isSubmitting
+              ? 'Creating Account...'
+              : (activeRole === 'student' ? 'Complete Registration & Start' : 'Submit Mess for Verification →')}
           </button>
         </form>
 

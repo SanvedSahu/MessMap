@@ -29,6 +29,7 @@ export const LoginPage: React.FC = () => {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (roleParam === 'owner') {
@@ -64,15 +65,22 @@ export const LoginPage: React.FC = () => {
       return;
     }
 
-    const result = await login(activeRole, email.trim(), password);
-    if (result.success) {
-      if (activeRole === 'owner') {
-        navigate('/owner/dashboard');
+    setIsSubmitting(true);
+    try {
+      const result = await login(activeRole, email.trim(), password);
+      if (result.success) {
+        if (activeRole === 'owner') {
+          navigate('/owner/dashboard');
+        } else {
+          navigate('/student/dashboard');
+        }
       } else {
-        navigate('/student/dashboard');
+        setError(result.error || 'Authentication failed. Please verify credentials.');
       }
-    } else {
-      setError(result.error || 'Authentication failed. Please verify credentials.');
+    } catch (err: any) {
+      setError(err?.message || 'Authentication failed. Please try again.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -331,12 +339,17 @@ export const LoginPage: React.FC = () => {
           <button
             type="submit"
             className="btn btn-primary btn-lg"
+            disabled={isSubmitting}
             style={{
               width: '100%',
               backgroundColor: activeRole === 'owner' ? '#d97706' : 'var(--primary)',
+              opacity: isSubmitting ? 0.7 : 1,
+              cursor: isSubmitting ? 'not-allowed' : 'pointer',
             }}
           >
-            Sign In as {activeRole === 'student' ? 'Student' : 'Mess Owner'}
+            {isSubmitting
+              ? 'Signing In...'
+              : `Sign In as ${activeRole === 'student' ? 'Student' : 'Mess Owner'}`}
           </button>
         </form>
 
