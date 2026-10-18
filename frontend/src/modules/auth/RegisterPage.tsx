@@ -126,6 +126,7 @@ export const RegisterPage: React.FC = () => {
       registerOwner({
         name: fullName.trim(),
         email: email.trim(),
+        password: password,
         phone: phone.trim(),
         messName: messName.trim(),
         messId: newMessId,
