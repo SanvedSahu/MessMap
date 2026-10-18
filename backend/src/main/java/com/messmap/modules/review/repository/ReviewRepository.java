@@ -20,6 +20,8 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
 
     List<Review> findByMessIdAndStatus(Long messId, ReviewStatus status);
 
+    List<Review> findByMessIdAndStatusOrderByCreatedAtDesc(Long messId, ReviewStatus status);
+
     List<Review> findByUserId(Long userId);
 
     long countByMessIdAndStatus(Long messId, ReviewStatus status);

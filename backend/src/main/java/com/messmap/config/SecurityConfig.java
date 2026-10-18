@@ -52,8 +52,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/health", "/api/health/**", "/api/v1/health", "/api/v1/health/**").permitAll()
                         // Public authentication endpoints (registration & login) - both /api and /api/v1
                         .requestMatchers("/api/auth/**", "/api/v1/auth/**").permitAll()
-                        // Public mess discovery endpoints
-                        .requestMatchers("/api/messes", "/api/messes/**", "/api/v1/messes", "/api/v1/messes/**").permitAll()
+                        // Public mess discovery endpoints (GET only)
+                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/messes", "/api/messes/**", "/api/v1/messes", "/api/v1/messes/**").permitAll()
                         // Swagger & OpenAPI documentation
                         .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                         // Protected Admin endpoints strictly restricted to ROLE_ADMIN
