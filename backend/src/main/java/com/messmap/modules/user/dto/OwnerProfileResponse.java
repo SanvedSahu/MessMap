@@ -62,6 +62,9 @@ public class OwnerProfileResponse {
         private OperatingStatus operatingStatus;
         private String openingTime;
         private String closingTime;
+        private String breakfastTiming;
+        private String lunchTiming;
+        private String dinnerTiming;
         private String heroImage;
 
         public static OwnerMessSummary fromEntity(Mess mess) {
@@ -80,6 +83,9 @@ public class OwnerProfileResponse {
                     .operatingStatus(mess.getOperatingStatus())
                     .openingTime(mess.getOpeningTime())
                     .closingTime(mess.getClosingTime())
+                    .breakfastTiming(mess.getBreakfastTiming())
+                    .lunchTiming(mess.getLunchTiming())
+                    .dinnerTiming(mess.getDinnerTiming())
                     .heroImage(mess.getHeroImage())
                     .build();
         }

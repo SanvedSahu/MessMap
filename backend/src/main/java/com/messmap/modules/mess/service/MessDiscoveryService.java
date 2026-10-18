@@ -150,9 +150,9 @@ public class MessDiscoveryService {
 
         // Structured meal timings
         MealTimingsDto mealTimings = MealTimingsDto.builder()
-                .breakfast(mess.getOpeningTime() != null ? mess.getOpeningTime() : "07:30 AM – 10:00 AM")
-                .lunch("12:15 PM – 03:00 PM")
-                .dinner(mess.getClosingTime() != null ? ("07:30 PM – " + mess.getClosingTime()) : "07:30 PM – 10:15 PM")
+                .breakfast(mess.getBreakfastTiming() != null ? mess.getBreakfastTiming() : (mess.getOpeningTime() != null ? mess.getOpeningTime() : "07:30 AM – 10:00 AM"))
+                .lunch(mess.getLunchTiming() != null ? mess.getLunchTiming() : "12:15 PM – 03:00 PM")
+                .dinner(mess.getDinnerTiming() != null ? mess.getDinnerTiming() : (mess.getClosingTime() != null ? ("07:30 PM – " + mess.getClosingTime()) : "07:30 PM – 10:15 PM"))
                 .build();
 
         return MessDetailResponse.builder()

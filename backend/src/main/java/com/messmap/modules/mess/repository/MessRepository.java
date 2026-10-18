@@ -55,4 +55,10 @@ public interface MessRepository extends JpaRepository<Mess, Long>, JpaSpecificat
     @EntityGraph(attributePaths = {"facilities", "images"})
     @Query("SELECT m FROM Mess m WHERE m.id = :id")
     Optional<Mess> findByIdWithDetails(@Param("id") Long id);
+
+    @EntityGraph(attributePaths = {"facilities", "images"})
+    @Query("SELECT m FROM Mess m WHERE m.owner.id = :ownerId")
+    List<Mess> findByOwnerIdWithDetails(@Param("ownerId") Long ownerId);
+
+    Optional<Mess> findFirstByOwnerIdOrderByIdAsc(Long ownerId);
 }
