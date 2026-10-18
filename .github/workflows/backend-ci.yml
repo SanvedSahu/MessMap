@@ -3,7 +3,9 @@ name: Backend CI
 on:
   push:
     branches:
-      - '**'
+      - 'dev'
+      - 'integration/**'
+      - 'main'
     paths:
       - 'backend/**'
       - '.github/workflows/backend-ci.yml'
@@ -11,10 +13,16 @@ on:
   pull_request:
     branches:
       - 'dev'
+      - 'integration/**'
+      - 'main'
     paths:
       - 'backend/**'
       - '.github/workflows/backend-ci.yml'
       - '.github/workflows/**'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -53,8 +61,16 @@ jobs:
         run: |
           if [ -f "./mvnw" ]; then
             chmod +x ./mvnw
-            ./mvnw clean test package
+            ./mvnw clean verify
           else
             echo "Maven wrapper (mvnw) not found, using system maven."
-            mvn clean test package
+            mvn clean verify
           fi
+
+      - name: Upload Surefire test reports on failure
+        if: failure() && steps.check_backend.outputs.pom_exists == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: surefire-test-reports
+          path: backend/target/surefire-reports/
+          if-no-files-found: ignore
