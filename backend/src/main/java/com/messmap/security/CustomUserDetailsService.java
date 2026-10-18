@@ -10,7 +10,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Custom UserDetailsService implementation loading UserPrincipal by user email.
+ * Custom UserDetailsService implementation loading UserPrincipal by user email or ID.
  */
 @Service
 @RequiredArgsConstructor
