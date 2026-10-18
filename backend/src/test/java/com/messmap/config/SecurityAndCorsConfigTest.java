@@ -44,7 +44,11 @@ class SecurityAndCorsConfigTest {
         CorsConfiguration config = corsConfigurationSource.getCorsConfiguration(request);
 
         assertThat(config).isNotNull();
-        assertThat(config.getAllowedOrigins()).contains("http://localhost:5173");
+        assertThat(config.getAllowedOrigins()).contains(
+                "http://localhost:5173",
+                "http://localhost:3000",
+                "http://localhost:3001"
+        );
         assertThat(config.getAllowedMethods()).contains("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS");
         assertThat(config.getAllowCredentials()).isTrue();
     }

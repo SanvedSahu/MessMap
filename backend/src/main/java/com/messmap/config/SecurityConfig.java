@@ -56,6 +56,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/messes/public/**").permitAll()
                         // Swagger & OpenAPI documentation
                         .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
+                        // Protected Admin endpoints strictly restricted to ROLE_ADMIN
+                        .requestMatchers("/api/admin/**", "/api/v1/admin/**").hasRole("ADMIN")
                         // Protected Mess Owner endpoints requiring authentication
                         .requestMatchers("/api/v1/owner/**").hasAnyAuthority("ROLE_MESS_OWNER", "ROLE_ADMIN")
                         // Any other request requires authentication

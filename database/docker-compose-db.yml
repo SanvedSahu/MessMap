@@ -4,7 +4,7 @@ services:
     container_name: messmap-mysql
     restart: unless-stopped
     environment:
-      MYSQL_DATABASE: ${MYSQL_DATABASE:-messmap_db}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-messmap_dev_db}
       MYSQL_USER: ${MYSQL_USER:-messmap_user}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:-messmap_secret_password}
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-messmap_root_password}
