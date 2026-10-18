@@ -29,7 +29,7 @@ export const AdminLoginPage: React.FC = () => {
     setError(null);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
 
@@ -42,7 +42,7 @@ export const AdminLoginPage: React.FC = () => {
       return;
     }
 
-    const result = login('admin', email.trim(), password);
+    const result = await login('admin', email.trim(), password);
     if (result.success) {
       navigate('/admin');
     } else {
