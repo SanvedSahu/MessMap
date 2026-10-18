@@ -53,7 +53,7 @@ public class SecurityConfig {
                         // Public authentication endpoints (registration & login) - both /api and /api/v1
                         .requestMatchers("/api/auth/**", "/api/v1/auth/**").permitAll()
                         // Public mess discovery endpoints
-                        .requestMatchers("/api/messes/public/**", "/api/v1/messes/public/**").permitAll()
+                        .requestMatchers("/api/messes", "/api/messes/**", "/api/v1/messes", "/api/v1/messes/**").permitAll()
                         // Swagger & OpenAPI documentation
                         .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                         // Protected Admin endpoints strictly restricted to ROLE_ADMIN
