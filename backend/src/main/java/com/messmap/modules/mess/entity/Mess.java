@@ -128,6 +128,18 @@ public class Mess extends BaseEntity {
     @Column(name = "closing_time", length = 20)
     private String closingTime;
 
+    @Size(max = 50, message = "Breakfast timing must not exceed 50 characters")
+    @Column(name = "breakfast_timing", length = 50)
+    private String breakfastTiming;
+
+    @Size(max = 50, message = "Lunch timing must not exceed 50 characters")
+    @Column(name = "lunch_timing", length = 50)
+    private String lunchTiming;
+
+    @Size(max = 50, message = "Dinner timing must not exceed 50 characters")
+    @Column(name = "dinner_timing", length = 50)
+    private String dinnerTiming;
+
     @Size(max = 255, message = "Rejection reason must not exceed 255 characters")
     @Column(name = "rejection_reason", length = 255)
     private String rejectionReason;
