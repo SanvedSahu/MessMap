@@ -74,4 +74,9 @@ public class User extends BaseEntity {
     @Size(max = 255, message = "Avatar URL must not exceed 255 characters")
     @Column(name = "avatar_url", length = 255)
     private String avatarUrl;
+
+    @Enumerated(EnumType.STRING)
+    @Builder.Default
+    @Column(name = "dietary_preference", length = 30)
+    private DietaryPreference dietaryPreference = DietaryPreference.VEG;
 }

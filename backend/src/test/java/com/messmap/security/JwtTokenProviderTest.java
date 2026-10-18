@@ -21,8 +21,8 @@ class JwtTokenProviderTest {
     }
 
     @Test
-    @DisplayName("Should generate valid JWT token with claims and parse accurately")
-    void testGenerateAndValidateToken() {
+    @DisplayName("Should generate valid JWT token with claims and parse accurately for owner")
+    void testGenerateAndValidateTokenForOwner() {
         User user = User.builder()
                 .id(42L)
                 .name("Rajesh Sharma")
@@ -41,6 +41,18 @@ class JwtTokenProviderTest {
     }
 
     @Test
+    @DisplayName("generateToken and parse claims correctly for student")
+    void testGenerateAndValidateTokenForStudent() {
+        String token = tokenProvider.generateToken(42L, "student@test.com", "Student Test", Role.ROLE_STUDENT);
+
+        assertThat(token).isNotBlank();
+        assertThat(tokenProvider.validateToken(token)).isTrue();
+        assertThat(tokenProvider.getEmailFromToken(token)).isEqualTo("student@test.com");
+        assertThat(tokenProvider.getUserIdFromToken(token)).isEqualTo(42L);
+        assertThat(tokenProvider.getRoleFromToken(token)).isEqualTo("ROLE_STUDENT");
+    }
+
+    @Test
     @DisplayName("Should reject invalid or tampered JWT token")
     void testValidateTamperedToken() {
         User user = User.builder()
@@ -55,6 +67,7 @@ class JwtTokenProviderTest {
 
         assertThat(tokenProvider.validateToken(tamperedToken)).isFalse();
         assertThat(tokenProvider.validateToken("")).isFalse();
+        assertThat(tokenProvider.validateToken(null)).isFalse();
         assertThat(tokenProvider.validateToken("not.a.valid.jwt")).isFalse();
     }
 
@@ -66,5 +79,6 @@ class JwtTokenProviderTest {
         String token = expiredProvider.generateToken(1L, "expired@messmap.com", "Expired", Role.ROLE_STUDENT);
 
         assertThat(expiredProvider.validateToken(token)).isFalse();
+        assertThat(tokenProvider.validateToken(token)).isFalse();
     }
 }

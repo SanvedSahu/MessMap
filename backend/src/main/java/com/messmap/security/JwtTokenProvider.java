@@ -3,7 +3,6 @@ package com.messmap.security;
 import com.messmap.modules.user.entity.Role;
 import com.messmap.modules.user.entity.User;
 import io.jsonwebtoken.*;
-import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
 import io.jsonwebtoken.security.SecurityException;
 import lombok.extern.slf4j.Slf4j;
@@ -14,6 +13,7 @@ import org.springframework.stereotype.Component;
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.util.Date;
+import java.util.HexFormat;
 
 /**
  * Utility component for generating, parsing, and validating JSON Web Tokens (JWT).
@@ -39,12 +39,12 @@ public class JwtTokenProvider {
         byte[] keyBytes;
         try {
             if (secret != null && secret.matches("^[0-9a-fA-F]{64}$")) {
-                keyBytes = java.util.HexFormat.of().parseHex(secret);
+                keyBytes = HexFormat.of().parseHex(secret);
             } else if (secret != null && secret.length() >= 32) {
                 keyBytes = secret.getBytes(StandardCharsets.UTF_8);
             } else {
                 // Fallback safe 256-bit key
-                keyBytes = java.util.HexFormat.of().parseHex("404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970");
+                keyBytes = HexFormat.of().parseHex("404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970");
             }
         } catch (Exception e) {
             log.warn("Failed to decode secret as HEX, falling back to UTF-8 bytes: {}", e.getMessage());

@@ -49,17 +49,19 @@ public class SecurityConfig {
                 )
                 .authorizeHttpRequests(auth -> auth
                         // Public health monitoring endpoints
-                        .requestMatchers("/api/v1/health", "/api/v1/health/**").permitAll()
-                        // Public authentication endpoints (registration & login)
-                        .requestMatchers("/api/v1/auth/**").permitAll()
+                        .requestMatchers("/api/health", "/api/health/**", "/api/v1/health", "/api/v1/health/**").permitAll()
+                        // Public authentication endpoints (registration & login) - both /api and /api/v1
+                        .requestMatchers("/api/auth/**", "/api/v1/auth/**").permitAll()
                         // Public mess discovery endpoints
-                        .requestMatchers("/api/v1/messes/public/**").permitAll()
+                        .requestMatchers("/api/messes/public/**", "/api/v1/messes/public/**").permitAll()
                         // Swagger & OpenAPI documentation
                         .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                         // Protected Admin endpoints strictly restricted to ROLE_ADMIN
                         .requestMatchers("/api/admin/**", "/api/v1/admin/**").hasRole("ADMIN")
                         // Protected Mess Owner endpoints requiring authentication
-                        .requestMatchers("/api/v1/owner/**").hasAnyAuthority("ROLE_MESS_OWNER", "ROLE_ADMIN")
+                        .requestMatchers("/api/owner/**", "/api/v1/owner/**").hasAnyAuthority("ROLE_MESS_OWNER", "ROLE_ADMIN")
+                        // Protected Student endpoints requiring ROLE_STUDENT authority
+                        .requestMatchers("/api/student/**", "/api/v1/student/**").hasAnyAuthority("ROLE_STUDENT", "ROLE_ADMIN")
                         // Any other request requires authentication
                         .anyRequest().authenticated()
                 )

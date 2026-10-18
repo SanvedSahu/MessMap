@@ -1,6 +1,7 @@
 package com.messmap.modules.user.dto;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.messmap.modules.user.entity.DietaryPreference;
 import com.messmap.modules.user.entity.Role;
 import com.messmap.modules.user.entity.User;
 import com.messmap.modules.user.entity.UserStatus;
@@ -28,7 +29,9 @@ public class UserResponse {
     private Role role;
     private UserStatus status;
     private String college;
+    private String collegeOrLocality;
     private String hostel;
+    private DietaryPreference dietaryPreference;
     private String avatarUrl;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
@@ -45,7 +48,9 @@ public class UserResponse {
                 .role(user.getRole())
                 .status(user.getStatus())
                 .college(user.getCollege())
+                .collegeOrLocality(user.getCollege())
                 .hostel(user.getHostel())
+                .dietaryPreference(user.getDietaryPreference())
                 .avatarUrl(user.getAvatarUrl())
                 .createdAt(user.getCreatedAt())
                 .updatedAt(user.getUpdatedAt())
