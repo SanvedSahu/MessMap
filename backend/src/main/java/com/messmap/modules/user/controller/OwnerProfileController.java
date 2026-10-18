@@ -23,7 +23,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/v1/owner/profile")
 @RequiredArgsConstructor
-@PreAuthorize("hasRole('ROLE_MESS_OWNER') or hasRole('ROLE_ADMIN')")
+@PreAuthorize("hasRole('MESS_OWNER') or hasRole('ADMIN')")
 public class OwnerProfileController {
 
     private final OwnerProfileService ownerProfileService;
