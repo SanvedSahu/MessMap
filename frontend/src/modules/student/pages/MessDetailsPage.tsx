@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import {
   MapPin,
@@ -10,33 +10,83 @@ import {
   MessageCircle,
   ChevronLeft,
   Award,
+  RefreshCw,
+  UtensilsCrossed,
 } from 'lucide-react';
-import { mockMesses } from '../../../data/mockMesses';
-import { mockReviews } from '../../../data/mockReviews';
-import { useMessData } from '../../../context/MessDataContext';
+import {
+  getMessByIdApi,
+  getMessReviewsApi,
+  adaptMessDetailToMessItem,
+  MenuItemDto,
+  ReviewApiResponse,
+} from '../../../api/studentApi';
 import { FoodBadge, StatusBadge } from '../../../components/ui/Badge';
 import { MessMapView } from '../components/MessMapView';
 import { useFavorites } from '../../../context/FavoritesContext';
 import { useNotification } from '../../../context/NotificationContext';
-import { MessItem, ReviewItem } from '../../../types/student.types';
+import { MessItem } from '../../../types/student.types';
 
 export const MessDetailsPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { isFavorite, toggleFavorite } = useFavorites();
   const { showToast } = useNotification();
-  const { messes } = useMessData();
 
-  const allMesses = (messes && messes.length > 0 ? (messes as unknown as MessItem[]) : (mockMesses as unknown as MessItem[]));
-  const mess: MessItem = allMesses.find((m) => m.id === id) || (mockMesses[0] as unknown as MessItem);
-  const favorited = isFavorite(mess.id);
-
-  const [activePhoto, setActivePhoto] = useState<string>(mess.heroImage);
+  const [mess, setMess] = useState<(MessItem & { menuItems?: MenuItemDto[] }) | null>(null);
+  const [reviews, setReviews] = useState<ReviewApiResponse[]>([]);
+  const [averageRating, setAverageRating] = useState<number>(0);
+  const [totalReviews, setTotalReviews] = useState<number>(0);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+  const [activePhoto, setActivePhoto] = useState<string>('');
   const [activeTab, setActiveTab] = useState<'menu' | 'plans' | 'timings' | 'reviews'>('menu');
+  const [refreshTrigger, setRefreshTrigger] = useState<number>(0);
 
-  const messReviews = (mockReviews as unknown as ReviewItem[]).filter((r) => r.messId === mess.id);
+  const favorited = mess ? isFavorite(mess.id) : false;
+
+  useEffect(() => {
+    if (!id) return;
+    let isCurrent = true;
+    setIsLoading(true);
+    setError(null);
+
+    Promise.all([
+      getMessByIdApi(id),
+      getMessReviewsApi(id).catch(() => null),
+    ])
+      .then(([messRes, reviewsRes]) => {
+        if (!isCurrent) return;
+        if (messRes && messRes.data) {
+          const adapted = adaptMessDetailToMessItem(messRes.data);
+          setMess(adapted);
+          setActivePhoto(adapted.heroImage);
+        } else {
+          setError('Mess listing not found or is awaiting administrative approval.');
+        }
+
+        if (reviewsRes && reviewsRes.data) {
+          setReviews(reviewsRes.data.reviews || []);
+          setAverageRating(reviewsRes.data.averageRating || 0);
+          setTotalReviews(reviewsRes.data.totalReviews || 0);
+        }
+      })
+      .catch((err: any) => {
+        if (!isCurrent) return;
+        setError(err?.message || 'Failed to load mess listing details from backend.');
+      })
+      .finally(() => {
+        if (isCurrent) {
+          setIsLoading(false);
+        }
+      });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [id, refreshTrigger]);
 
   const handleFavoriteClick = () => {
+    if (!mess) return;
     toggleFavorite(mess.id);
     showToast(
       favorited
@@ -52,6 +102,116 @@ export const MessDetailsPage: React.FC = () => {
       showToast('Mess link copied to clipboard! Share with your roommates 📋', 'success');
     }
   };
+
+  if (isLoading) {
+    return (
+      <div style={{ maxWidth: '900px', margin: '2rem auto' }}>
+        <button
+          type="button"
+          onClick={() => navigate(-1)}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px',
+            color: 'var(--text-muted)',
+            fontWeight: 600,
+            fontSize: '0.88rem',
+            background: 'none',
+            border: 'none',
+            cursor: 'pointer',
+            marginBottom: '1.5rem',
+          }}
+        >
+          <ChevronLeft size={18} /> Back to Messes
+        </button>
+        <div
+          className="card"
+          style={{
+            padding: '4rem 2rem',
+            textAlign: 'center',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '1rem',
+          }}
+        >
+          <div
+            style={{
+              width: '42px',
+              height: '42px',
+              borderRadius: '50%',
+              border: '3px solid var(--border-color)',
+              borderTopColor: 'var(--primary)',
+              animation: 'spin 0.8s linear infinite',
+            }}
+          />
+          <div>
+            <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-main)', margin: '0 0 6px 0' }}>
+              Loading Mess Listing...
+            </h3>
+            <p style={{ fontSize: '0.88rem', color: 'var(--text-muted)', margin: 0 }}>
+              Retrieving profile, operational hours, menus, and verified ratings from backend
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !mess) {
+    return (
+      <div style={{ maxWidth: '800px', margin: '2rem auto' }}>
+        <button
+          type="button"
+          onClick={() => navigate('/find-mess')}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px',
+            color: 'var(--text-muted)',
+            fontWeight: 600,
+            fontSize: '0.88rem',
+            background: 'none',
+            border: 'none',
+            cursor: 'pointer',
+            marginBottom: '1.5rem',
+          }}
+        >
+          <ChevronLeft size={18} /> Back to Mess Discovery
+        </button>
+        <div
+          className="card"
+          style={{
+            padding: '3rem 2rem',
+            textAlign: 'center',
+            border: '1.5px solid #fecaca',
+            background: '#fff5f5',
+          }}
+        >
+          <div style={{ fontSize: '2.5rem', marginBottom: '0.75rem' }}>🍽️</div>
+          <h2 style={{ fontSize: '1.4rem', fontWeight: 800, color: '#991b1b', marginBottom: '0.5rem' }}>
+            Mess Listing Unavailable
+          </h2>
+          <p style={{ color: '#7f1d1d', fontSize: '0.95rem', maxWidth: '520px', margin: '0 auto 1.5rem' }}>
+            {error || 'The requested mess facility could not be found or has not been approved yet.'}
+          </p>
+          <div style={{ display: 'flex', justifyContent: 'center', gap: '12px' }}>
+            <button
+              type="button"
+              onClick={() => setRefreshTrigger((prev) => prev + 1)}
+              className="btn btn-primary"
+            >
+              <RefreshCw size={14} /> Retry Connection
+            </button>
+            <Link to="/find-mess" className="btn btn-outline">
+              Explore Approved Messes
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -240,10 +400,10 @@ export const MessDetailsPage: React.FC = () => {
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <span style={{ color: 'var(--warning)', fontWeight: 800, fontSize: '0.95rem' }}>
-                  ★ {mess.rating}
+                  ★ {averageRating > 0 ? averageRating.toFixed(1) : mess.rating}
                 </span>
                 <span style={{ color: 'var(--text-muted)' }}>
-                  ({mess.reviewCount} student reviews)
+                  ({totalReviews || mess.reviewCount} student reviews)
                 </span>
               </div>
               <span style={{ color: 'var(--border-color)' }}>•</span>
@@ -314,151 +474,210 @@ export const MessDetailsPage: React.FC = () => {
               onClick={() => setActiveTab('reviews')}
               className={`mm-tab-btn ${activeTab === 'reviews' ? 'active' : ''}`}
             >
-              ⭐ Reviews ({messReviews.length})
+              ⭐ Reviews ({totalReviews || mess.reviewCount || 0})
             </button>
           </div>
 
           {/* TAB 1: MENU */}
           {activeTab === 'menu' && (
             <div>
-              {/* Today's Special Board */}
-              <div
-                style={{
-                  background: 'var(--primary-light)',
-                  border: '1.5px solid var(--success-border)',
-                  borderRadius: 'var(--radius-lg)',
-                  padding: '1.5rem',
-                  marginBottom: '1.75rem',
-                }}
-              >
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    marginBottom: '1rem',
-                  }}
-                >
-                  <span style={{ fontSize: '1.4rem' }}>🍲</span>
-                  <div>
-                    <h3
-                      style={{
-                        fontSize: '1.15rem',
-                        fontWeight: 800,
-                        color: 'var(--primary-dark)',
-                      }}
-                    >
-                      Today's Fresh Daily Menu (Live)
-                    </h3>
-                    <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                      Updated today by {mess.ownerName} at 10:00 AM
-                    </div>
-                  </div>
-                </div>
-
-                <div
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-                    gap: '1.25rem',
-                  }}
-                >
-                  {/* Lunch Card */}
+              {mess.menuItems && mess.menuItems.length > 0 ? (
+                <div>
                   <div
-                    className="card"
-                    style={{ padding: '1.2rem', borderColor: 'var(--success-border)' }}
+                    style={{
+                      background: 'var(--primary-light)',
+                      border: '1.5px solid var(--success-border)',
+                      borderRadius: 'var(--radius-lg)',
+                      padding: '1.25rem 1.5rem',
+                      marginBottom: '1.5rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      flexWrap: 'wrap',
+                      gap: '12px',
+                    }}
                   >
-                    <div
-                      style={{
-                        fontWeight: 800,
-                        fontSize: '0.95rem',
-                        color: 'var(--primary-dark)',
-                        marginBottom: '0.5rem',
-                      }}
-                    >
-                      🍛 LUNCH (12:15 – 3:00 PM)
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <span style={{ fontSize: '1.6rem' }}>🍲</span>
+                      <div>
+                        <h3
+                          style={{
+                            fontSize: '1.15rem',
+                            fontWeight: 800,
+                            color: 'var(--primary-dark)',
+                            margin: 0,
+                          }}
+                        >
+                          Today's Active Menu ({mess.menuItems.length} items)
+                        </h3>
+                        <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                          Published by mess management & verified for campus diners
+                        </div>
+                      </div>
                     </div>
-                    <ul
-                      style={{
-                        listStyle: 'none',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '6px',
-                        fontSize: '0.85rem',
-                      }}
-                    >
-                      <li>
-                        <strong>Main Sabji:</strong> {mess.todayMenu?.lunch?.sabji1}
-                      </li>
-                      <li>
-                        <strong>Secondary Sabji:</strong> {mess.todayMenu?.lunch?.sabji2}
-                      </li>
-                      <li>
-                        <strong>Dal / Curry:</strong> {mess.todayMenu?.lunch?.dal}
-                      </li>
-                      <li>
-                        <strong>Rice:</strong> {mess.todayMenu?.lunch?.rice}
-                      </li>
-                      <li>
-                        <strong>Breads:</strong> {mess.todayMenu?.lunch?.bread}
-                      </li>
-                      <li>
-                        <strong>Sides:</strong> {mess.todayMenu?.lunch?.sides?.join(', ')}
-                      </li>
-                      {mess.todayMenu?.lunch?.sweet && (
-                        <li style={{ color: 'var(--primary-dark)', fontWeight: 700 }}>
-                          <strong>Sweet:</strong> {mess.todayMenu.lunch.sweet}
-                        </li>
-                      )}
-                    </ul>
                   </div>
 
-                  {/* Dinner Card */}
                   <div
-                    className="card"
-                    style={{ padding: '1.2rem', borderColor: 'var(--success-border)' }}
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+                      gap: '1rem',
+                    }}
                   >
-                    <div
-                      style={{
-                        fontWeight: 800,
-                        fontSize: '0.95rem',
-                        color: 'var(--text-main)',
-                        marginBottom: '0.5rem',
-                      }}
-                    >
-                      🌙 DINNER (7:30 – 10:15 PM)
-                    </div>
-                    <ul
-                      style={{
-                        listStyle: 'none',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '6px',
-                        fontSize: '0.85rem',
-                      }}
-                    >
-                      <li>
-                        <strong>Main Sabji:</strong> {mess.todayMenu?.dinner?.sabji1}
-                      </li>
-                      <li>
-                        <strong>Secondary Sabji:</strong> {mess.todayMenu?.dinner?.sabji2}
-                      </li>
-                      <li>
-                        <strong>Dal:</strong> {mess.todayMenu?.dinner?.dal}
-                      </li>
-                      <li>
-                        <strong>Rice:</strong> {mess.todayMenu?.dinner?.rice}
-                      </li>
-                      <li>
-                        <strong>Breads:</strong> {mess.todayMenu?.dinner?.bread}
-                      </li>
-                      <li>
-                        <strong>Sides:</strong> {mess.todayMenu?.dinner?.sides?.join(', ')}
-                      </li>
-                    </ul>
+                    {mess.menuItems.map((item) => (
+                      <div
+                        key={item.id}
+                        className="card"
+                        style={{
+                          padding: '1.25rem',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          justifyContent: 'space-between',
+                          borderLeft: '4px solid var(--primary)',
+                        }}
+                      >
+                        <div>
+                          <div
+                            style={{
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'flex-start',
+                              gap: '8px',
+                              marginBottom: '6px',
+                            }}
+                          >
+                            <h4
+                              style={{
+                                fontSize: '1rem',
+                                fontWeight: 800,
+                                color: 'var(--text-main)',
+                                margin: 0,
+                              }}
+                            >
+                              {item.name}
+                            </h4>
+                            {item.category && (
+                              <span
+                                style={{
+                                  fontSize: '0.72rem',
+                                  fontWeight: 700,
+                                  background: 'var(--primary-light)',
+                                  color: 'var(--primary-dark)',
+                                  padding: '2px 8px',
+                                  borderRadius: 'var(--radius-full)',
+                                }}
+                              >
+                                {item.category}
+                              </span>
+                            )}
+                          </div>
+                          {item.description && (
+                            <p
+                              style={{
+                                fontSize: '0.82rem',
+                                color: 'var(--text-muted)',
+                                lineHeight: 1.4,
+                                margin: 0,
+                              }}
+                            >
+                              {item.description}
+                            </p>
+                          )}
+                        </div>
+
+                        <div
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            marginTop: '1rem',
+                            paddingTop: '0.75rem',
+                            borderTop: '1px solid var(--border-color)',
+                          }}
+                        >
+                          <span
+                            style={{
+                              fontSize: '0.78rem',
+                              fontWeight: 600,
+                              color: item.isAvailable ? 'var(--primary-dark)' : 'var(--text-muted)',
+                            }}
+                          >
+                            {item.isAvailable ? '✓ Serving Today' : 'Currently Unavailable'}
+                          </span>
+                          {item.price !== undefined && item.price !== null && (
+                            <span
+                              style={{
+                                fontSize: '1.05rem',
+                                fontWeight: 800,
+                                color: 'var(--text-main)',
+                              }}
+                            >
+                              ₹{item.price}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
-              </div>
+              ) : (
+                <div
+                  className="card"
+                  style={{
+                    padding: '2.5rem 1.5rem',
+                    textAlign: 'center',
+                    background: 'var(--bg-card-subtle)',
+                  }}
+                >
+                  <UtensilsCrossed
+                    size={36}
+                    color="var(--text-muted)"
+                    style={{ margin: '0 auto 0.75rem' }}
+                  />
+                  <h3
+                    style={{
+                      fontSize: '1.15rem',
+                      fontWeight: 800,
+                      color: 'var(--text-main)',
+                      marginBottom: '0.4rem',
+                    }}
+                  >
+                    Daily Menu Not Published Yet
+                  </h3>
+                  <p
+                    style={{
+                      color: 'var(--text-muted)',
+                      fontSize: '0.88rem',
+                      maxWidth: '480px',
+                      margin: '0 auto 1.25rem',
+                      lineHeight: 1.5,
+                    }}
+                  >
+                    This mess has not published live menu items for today yet. Single meal thali rate is ₹
+                    {mess.dailyPrice}. Please call or WhatsApp {mess.ownerName} directly for today's menu update.
+                  </p>
+                  <div style={{ display: 'flex', justifyContent: 'center', gap: '10px' }}>
+                    <a
+                      href={`tel:${mess.phone}`}
+                      className="btn btn-primary btn-sm"
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                    >
+                      <Phone size={14} /> Call {mess.phone}
+                    </a>
+                    <a
+                      href={`https://wa.me/${mess.whatsapp}?text=Hi%2C%20what%20is%20today%27s%20menu%20at%20${encodeURIComponent(
+                        mess.name
+                      )}%3F`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="btn btn-outline btn-sm"
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                    >
+                      <MessageCircle size={14} /> WhatsApp
+                    </a>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -632,18 +851,23 @@ export const MessDetailsPage: React.FC = () => {
                   marginBottom: '1.25rem',
                 }}
               >
-                <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-main)' }}>
-                  Student Reviews ({messReviews.length})
-                </h3>
+                <div>
+                  <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-main)', margin: 0 }}>
+                    Student Reviews ({reviews.length})
+                  </h3>
+                  <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                    Average Rating: <strong style={{ color: 'var(--warning)' }}>★ {averageRating > 0 ? averageRating.toFixed(1) : mess.rating}</strong> ({totalReviews || mess.reviewCount} total ratings)
+                  </div>
+                </div>
                 <Link to="/reviews" className="btn btn-outline btn-sm">
                   Write a Review
                 </Link>
               </div>
 
-              {messReviews.length === 0 ? (
-                <div className="empty-state-box" style={{ padding: '2.5rem 1rem' }}>
+              {reviews.length === 0 ? (
+                <div className="empty-state-box" style={{ padding: '2.5rem 1rem', textAlign: 'center' }}>
                   <p style={{ color: 'var(--text-muted)', marginBottom: '1rem' }}>
-                    No reviews submitted yet for this mess.
+                    No student reviews submitted yet for this mess.
                   </p>
                   <Link to="/reviews" className="btn btn-primary btn-sm">
                     Be the first to review
@@ -651,7 +875,7 @@ export const MessDetailsPage: React.FC = () => {
                 </div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                  {messReviews.map((rev) => (
+                  {reviews.map((rev) => (
                     <div key={rev.id} className="card" style={{ padding: '1.25rem' }}>
                       <div
                         style={{
@@ -661,25 +885,35 @@ export const MessDetailsPage: React.FC = () => {
                         }}
                       >
                         <div>
-                          <div style={{ fontWeight: 700, fontSize: '0.95rem' }}>{rev.userName}</div>
+                          <div style={{ fontWeight: 700, fontSize: '0.95rem' }}>
+                            {rev.userName || 'Student Diner'}
+                          </div>
                           <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                            {rev.userCollege || 'Pune University'} • {rev.date}
+                            {rev.userCollege || 'Campus Student'} • {rev.createdAt ? new Date(rev.createdAt).toLocaleDateString() : 'Recent'}
                           </div>
                         </div>
                         <span style={{ color: 'var(--warning)', fontWeight: 800, fontSize: '0.9rem' }}>
                           ★ {rev.rating}
                         </span>
                       </div>
-                      <p
-                        style={{
-                          fontSize: '0.88rem',
-                          color: 'var(--text-secondary)',
-                          lineHeight: 1.5,
-                          marginBottom: '8px',
-                        }}
-                      >
-                        "{rev.comment}"
-                      </p>
+                      {rev.comment && (
+                        <p
+                          style={{
+                            fontSize: '0.88rem',
+                            color: 'var(--text-secondary)',
+                            lineHeight: 1.5,
+                            margin: '8px 0',
+                          }}
+                        >
+                          "{rev.comment}"
+                        </p>
+                      )}
+                      {(rev.foodQualityScore || rev.hygieneScore) && (
+                        <div style={{ display: 'flex', gap: '12px', fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+                          {rev.foodQualityScore && <span>Food Taste: {rev.foodQualityScore}/5</span>}
+                          {rev.hygieneScore && <span>Hygiene: {rev.hygieneScore}/5</span>}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>

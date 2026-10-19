@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   Search,
@@ -8,9 +8,13 @@ import {
   Grid,
   X,
   RotateCcw,
+  RefreshCw,
 } from 'lucide-react';
-import { mockMesses } from '../../../data/mockMesses';
-import { useMessData } from '../../../context/MessDataContext';
+import {
+  getMessesApi,
+  adaptMessSummaryToMessItem,
+  MessFilterParams,
+} from '../../../api/studentApi';
 import { MessCard } from '../components/MessCard';
 import { MessMapView } from '../components/MessMapView';
 import { EmptyState } from '../../../components/ui/EmptyState';
@@ -18,13 +22,14 @@ import { MessItem } from '../../../types/student.types';
 
 export const FindMessPage: React.FC = () => {
   const [searchParams] = useSearchParams();
-  const { approvedMesses } = useMessData();
   const initialView = searchParams.get('view') === 'map' ? 'split' : 'split';
 
   // Filters State
   const initialQuery = searchParams.get('search') || searchParams.get('q') || '';
   const [searchTerm, setSearchTerm] = useState<string>(initialQuery);
+  const [debouncedSearch, setDebouncedSearch] = useState<string>(initialQuery);
   const [selectedFoodType, setSelectedFoodType] = useState<string>('all');
+  const [selectedLocality, setSelectedLocality] = useState<string>('all');
   const [maxPrice, setMaxPrice] = useState<number>(4500);
   const [maxDistance, setMaxDistance] = useState<number>(3.0);
   const [minRating, setMinRating] = useState<number>(0);
@@ -32,51 +37,73 @@ export const FindMessPage: React.FC = () => {
   const [selectedMessId, setSelectedMessId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<string>(initialView);
 
-  // Use only approved messes so pending/rejected never appear in student search
-  const liveMesses: MessItem[] = (approvedMesses && approvedMesses.length > 0
-    ? (approvedMesses as unknown as MessItem[])
-    : (mockMesses as unknown as MessItem[]));
+  // Backend Live State
+  const [backendMesses, setBackendMesses] = useState<MessItem[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+  const [refreshTrigger, setRefreshTrigger] = useState<number>(0);
 
-  // Filtered messes logic
-  const filteredMesses = useMemo(() => {
-    return liveMesses.filter((mess) => {
-      if (searchTerm.trim()) {
-        const query = searchTerm.toLowerCase();
-        const matchesName = mess.name.toLowerCase().includes(query);
-        const matchesAddress = mess.address.toLowerCase().includes(query);
-        const matchesLandmark = mess.landmark?.toLowerCase().includes(query);
-        const matchesTagline = mess.tagline?.toLowerCase().includes(query);
-        const matchesDish =
-          mess.todayMenu?.lunch?.sabji1?.toLowerCase().includes(query) ||
-          mess.todayMenu?.lunch?.sabji2?.toLowerCase().includes(query);
+  // Debounce search input to avoid duplicate / race condition requests
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
 
-        if (!matchesName && !matchesAddress && !matchesLandmark && !matchesTagline && !matchesDish) {
-          return false;
+  // Fetch live messes from backend GET /api/messes
+  useEffect(() => {
+    let isCurrent = true;
+    setIsLoading(true);
+    setError(null);
+
+    const params: MessFilterParams = {
+      search: debouncedSearch.trim() || undefined,
+      foodType: selectedFoodType !== 'all' ? selectedFoodType : undefined,
+      locality: selectedLocality !== 'all' ? selectedLocality : undefined,
+      maxPrice: maxPrice < 4500 ? maxPrice : undefined,
+    };
+
+    getMessesApi(params)
+      .then((res) => {
+        if (!isCurrent) return;
+        if (res && Array.isArray(res.data)) {
+          const adapted = res.data.map(adaptMessSummaryToMessItem);
+          setBackendMesses(adapted);
+        } else {
+          setBackendMesses([]);
         }
-      }
+      })
+      .catch((err: any) => {
+        if (!isCurrent) return;
+        setError(err?.message || 'Unable to connect to MessMap backend service.');
+        setBackendMesses([]);
+      })
+      .finally(() => {
+        if (isCurrent) {
+          setIsLoading(false);
+        }
+      });
 
-      if (selectedFoodType !== 'all') {
-        if (selectedFoodType === 'Pure Veg' && mess.foodType !== 'Pure Veg') return false;
-        if (
-          selectedFoodType === 'Veg & Non-Veg' &&
-          mess.foodType !== 'Veg & Non-Veg' &&
-          !mess.foodType.includes('Both')
-        )
-          return false;
-      }
+    return () => {
+      isCurrent = false;
+    };
+  }, [debouncedSearch, selectedFoodType, selectedLocality, maxPrice, refreshTrigger]);
 
-      if (mess.monthlyPrice > maxPrice) return false;
-      if (mess.distanceKm > maxDistance) return false;
+  // Client-side secondary filters for rating, distance, open status
+  const filteredMesses = useMemo(() => {
+    return backendMesses.filter((mess) => {
+      if (maxDistance && mess.distanceKm > maxDistance) return false;
       if (minRating > 0 && mess.rating < minRating) return false;
       if (onlyOpen && !mess.isOpenNow) return false;
-
       return true;
     });
-  }, [liveMesses, searchTerm, selectedFoodType, maxPrice, maxDistance, minRating, onlyOpen]);
+  }, [backendMesses, maxDistance, minRating, onlyOpen]);
 
   const handleResetFilters = () => {
     setSearchTerm('');
     setSelectedFoodType('all');
+    setSelectedLocality('all');
     setMaxPrice(4500);
     setMaxDistance(3.0);
     setMinRating(0);
@@ -87,6 +114,7 @@ export const FindMessPage: React.FC = () => {
   const isFilterActive =
     searchTerm ||
     selectedFoodType !== 'all' ||
+    selectedLocality !== 'all' ||
     maxPrice < 4500 ||
     maxDistance < 3.0 ||
     minRating > 0 ||
@@ -266,7 +294,7 @@ export const FindMessPage: React.FC = () => {
             })}
           </div>
 
-          {/* Distance Filter */}
+          {/* Locality Filter */}
           <div
             style={{
               display: 'flex',
@@ -280,7 +308,43 @@ export const FindMessPage: React.FC = () => {
             }}
           >
             <MapPin size={14} color="var(--primary)" />
-            <span style={{ color: 'var(--text-muted)' }}>Distance:</span>
+            <span style={{ color: 'var(--text-muted)' }}>Locality:</span>
+            <select
+              value={selectedLocality}
+              onChange={(e) => setSelectedLocality(e.target.value)}
+              style={{
+                border: 'none',
+                background: 'transparent',
+                fontWeight: 700,
+                color: 'var(--text-main)',
+                cursor: 'pointer',
+                outline: 'none',
+              }}
+            >
+              <option value="all">All Localities</option>
+              <option value="Shivajinagar">Shivajinagar</option>
+              <option value="Kothrud">Kothrud</option>
+              <option value="FC Road">FC Road</option>
+              <option value="Deccan">Deccan</option>
+              <option value="Model Colony">Model Colony</option>
+              <option value="Karve Nagar">Karve Nagar</option>
+            </select>
+          </div>
+
+          {/* Distance Filter */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              background: 'var(--bg-card-subtle)',
+              padding: '4px 10px',
+              borderRadius: 'var(--radius-md)',
+              border: '1px solid var(--border-color)',
+              fontSize: '0.82rem',
+            }}
+          >
+            <span style={{ color: 'var(--text-muted)' }}>Radius:</span>
             <select
               value={maxDistance}
               onChange={(e) => setMaxDistance(Number(e.target.value))}
@@ -386,27 +450,49 @@ export const FindMessPage: React.FC = () => {
             Open Now
           </label>
 
-          {/* Reset Filters */}
-          {isFilterActive && (
+          {/* Refresh & Reset Filters */}
+          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '8px' }}>
             <button
               type="button"
-              onClick={handleResetFilters}
+              onClick={() => setRefreshTrigger((prev) => prev + 1)}
               style={{
-                marginLeft: 'auto',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '4px',
                 fontSize: '0.78rem',
-                color: 'var(--danger)',
+                color: 'var(--primary-dark)',
                 fontWeight: 700,
-                background: 'none',
-                border: 'none',
+                background: 'var(--primary-light)',
+                border: '1px solid var(--success-border)',
+                borderRadius: 'var(--radius-sm)',
+                padding: '4px 8px',
                 cursor: 'pointer',
               }}
+              title="Refresh mess listings from backend"
             >
-              <RotateCcw size={13} /> Reset Filters
+              <RefreshCw size={12} className={isLoading ? 'animate-spin' : ''} /> Refresh
             </button>
-          )}
+
+            {isFilterActive && (
+              <button
+                type="button"
+                onClick={handleResetFilters}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  fontSize: '0.78rem',
+                  color: 'var(--danger)',
+                  fontWeight: 700,
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                }}
+              >
+                <RotateCcw size={13} /> Reset Filters
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -420,13 +506,78 @@ export const FindMessPage: React.FC = () => {
         }}
       >
         <div style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>
-          Showing <strong style={{ color: 'var(--text-main)' }}>{filteredMesses.length}</strong> of{' '}
-          {mockMesses.length} student messes found in Campus Area
+          {isLoading ? (
+            <span>Loading verified student messes from backend...</span>
+          ) : error ? (
+            <span style={{ color: 'var(--danger)' }}>Backend connection error</span>
+          ) : (
+            <span>
+              Showing <strong style={{ color: 'var(--text-main)' }}>{filteredMesses.length}</strong> of{' '}
+              {backendMesses.length} student messes found
+            </span>
+          )}
         </div>
       </div>
 
-      {/* MAIN VIEW CONTENT (SPLIT, GRID, OR MAP) */}
-      {filteredMesses.length === 0 ? (
+      {/* MAIN VIEW CONTENT (LOADING, ERROR, EMPTY, SPLIT, GRID, OR MAP) */}
+      {isLoading ? (
+        <div
+          className="card"
+          style={{
+            padding: '3.5rem 2rem',
+            textAlign: 'center',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '1rem',
+          }}
+        >
+          <div
+            style={{
+              width: '40px',
+              height: '40px',
+              borderRadius: '50%',
+              border: '3px solid var(--border-color)',
+              borderTopColor: 'var(--primary)',
+              animation: 'spin 0.8s linear infinite',
+            }}
+          />
+          <div>
+            <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-main)', margin: '0 0 4px 0' }}>
+              Finding Verified Messes...
+            </h3>
+            <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: 0 }}>
+              Querying campus backend for approved mess listings, menus, and ratings
+            </p>
+          </div>
+        </div>
+      ) : error ? (
+        <div
+          className="card"
+          style={{
+            padding: '2.5rem 1.5rem',
+            textAlign: 'center',
+            border: '1.5px solid #fecaca',
+            background: '#fff5f5',
+          }}
+        >
+          <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>⚠️</div>
+          <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: '#991b1b', marginBottom: '0.4rem' }}>
+            Backend Unavailable
+          </h3>
+          <p style={{ color: '#7f1d1d', fontSize: '0.9rem', maxWidth: '520px', margin: '0 auto 1.25rem' }}>
+            {error}
+          </p>
+          <button
+            type="button"
+            onClick={() => setRefreshTrigger((prev) => prev + 1)}
+            className="btn btn-primary btn-sm"
+          >
+            Retry Loading Messes
+          </button>
+        </div>
+      ) : filteredMesses.length === 0 ? (
         <EmptyState
           title="No Nearby Messes Found"
           description="Try widening your distance filter or changing your dietary preference."

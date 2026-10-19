@@ -6,7 +6,6 @@ import {
   Columns,
   X
 } from 'lucide-react';
-import { mockMesses } from '../../../data/mockMesses';
 import { MessCard } from '../components/MessCard';
 import { EmptyState } from '../../../components/ui/EmptyState';
 import { useFavorites } from '../../../context/FavoritesContext';
@@ -15,11 +14,11 @@ import { MessItem } from '../../../types/student.types';
 
 export const FavoritesPage: React.FC = () => {
   const navigate = useNavigate();
-  const { favorites, removeFavorite } = useFavorites();
+  const { favorites, favoriteItems, removeFavorite, isLoading, refreshFavorites } = useFavorites();
   const { showToast } = useNotification();
   const [showCompare, setShowCompare] = useState(false);
 
-  const favoriteMesses = (mockMesses as unknown as MessItem[]).filter((m) => favorites.includes(m.id));
+  const favoriteMesses = favoriteItems;
 
   const handleClearAll = () => {
     favorites.forEach((id) => removeFavorite(id));

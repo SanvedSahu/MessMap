@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   ThumbsUp,
   ShieldCheck,
@@ -10,59 +10,130 @@ import {
   Trash2,
   X,
   CheckCircle2,
+  RefreshCw,
 } from 'lucide-react';
-import { mockReviews } from '../../../data/mockReviews';
-import { mockMesses } from '../../../data/mockMesses';
+import {
+  getMessesApi,
+  getMessReviewsApi,
+  submitReviewApi,
+  updateReviewApi,
+  deleteReviewApi,
+  ReviewApiResponse,
+  MessSummaryApiResponse,
+} from '../../../api/studentApi';
 import { StarRating } from '../../../components/ui/StarRating';
 import { useAuth } from '../../../context/AuthContext';
 import { useNotification } from '../../../context/NotificationContext';
-import { ReviewItem } from '../../../types/student.types';
 
 export const ReviewsPage: React.FC = () => {
   const { user } = useAuth();
   const { showToast } = useNotification();
+  const token = user?.token || localStorage.getItem('messmap_auth_token') || '';
 
-  // Load reviews with localStorage persistence fallback
-  const [reviewsList, setReviewsList] = useState<ReviewItem[]>(() => {
-    const saved = localStorage.getItem('messmap_student_reviews');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (e) {
-        console.error(e);
-      }
-    }
-    return mockReviews as unknown as ReviewItem[];
-  });
-
-  const [filterMess, setFilterMess] = useState('all');
-  const [filterRating, setFilterRating] = useState(0);
+  const [messes, setMesses] = useState<MessSummaryApiResponse[]>([]);
+  const [reviewsList, setReviewsList] = useState<ReviewApiResponse[]>([]);
+  const [filterMess, setFilterMess] = useState<string>('all');
+  const [filterRating, setFilterRating] = useState<number>(0);
   const [likedReviews, setLikedReviews] = useState<Record<string, boolean>>({});
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+  const [refreshTrigger, setRefreshTrigger] = useState<number>(0);
 
   // Review Form & Edit State
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingReviewId, setEditingReviewId] = useState<string | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
-  const [formMessId, setFormMessId] = useState(mockMesses[0].id);
-  const [formRating, setFormRating] = useState(5);
-  const [formTaste, setFormTaste] = useState(5);
-  const [formHygiene, setFormHygiene] = useState(5);
-  const [formComment, setFormComment] = useState('');
-  const [formTags, setFormTags] = useState(['Hot Phulkas', 'Clean Kitchen']);
+  const [formMessId, setFormMessId] = useState<string>('');
+  const [formRating, setFormRating] = useState<number>(5);
+  const [formTaste, setFormTaste] = useState<number>(5);
+  const [formHygiene, setFormHygiene] = useState<number>(5);
+  const [formComment, setFormComment] = useState<string>('');
+  const [formTags, setFormTags] = useState<string[]>(['Hot Phulkas', 'Clean Kitchen']);
 
-  const saveReviews = (newList: ReviewItem[]) => {
-    setReviewsList(newList);
-    try {
-      localStorage.setItem('messmap_student_reviews', JSON.stringify(newList));
-    } catch (e) {
-      console.error(e);
+  // Fetch approved messes for dropdowns
+  useEffect(() => {
+    getMessesApi()
+      .then((res) => {
+        if (res && Array.isArray(res.data)) {
+          setMesses(res.data);
+          if (res.data.length > 0 && !formMessId) {
+            setFormMessId(String(res.data[0].id));
+          }
+        }
+      })
+      .catch((err: any) => {
+        console.warn('Failed to load mess list for reviews:', err?.message);
+      });
+  }, []);
+
+  // Fetch reviews from backend
+  useEffect(() => {
+    let isCurrent = true;
+    setIsLoading(true);
+    setError(null);
+
+    if (filterMess !== 'all') {
+      getMessReviewsApi(filterMess)
+        .then((res) => {
+          if (!isCurrent) return;
+          setReviewsList(res.data?.reviews || []);
+        })
+        .catch((err: any) => {
+          if (!isCurrent) return;
+          setError(err?.message || 'Failed to load reviews from backend');
+          setReviewsList([]);
+        })
+        .finally(() => {
+          if (isCurrent) setIsLoading(false);
+        });
+    } else {
+      getMessesApi()
+        .then(async (res) => {
+          if (!isCurrent) return;
+          const loadedMesses = res.data || [];
+          if (loadedMesses.length === 0) {
+            setReviewsList([]);
+            setIsLoading(false);
+            return;
+          }
+
+          const allReviewPromises = loadedMesses.map((m) =>
+            getMessReviewsApi(m.id)
+              .then((r) => r.data?.reviews || [])
+              .catch(() => [] as ReviewApiResponse[])
+          );
+
+          const nested = await Promise.all(allReviewPromises);
+          if (!isCurrent) return;
+          const flattened = nested.flat();
+          flattened.sort((a, b) => {
+            const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+            const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+            return dateB - dateA;
+          });
+          setReviewsList(flattened);
+        })
+        .catch((err: any) => {
+          if (!isCurrent) return;
+          setError(err?.message || 'Failed to load messes and reviews');
+          setReviewsList([]);
+        })
+        .finally(() => {
+          if (isCurrent) setIsLoading(false);
+        });
     }
-  };
 
-  const isUserReview = (rev: ReviewItem) => {
-    const currentName = (user?.name || 'Rahul Patil').toLowerCase().trim();
-    return rev.userName.toLowerCase().trim() === currentName || rev.id === 'rev-user-1';
+    return () => {
+      isCurrent = false;
+    };
+  }, [filterMess, refreshTrigger]);
+
+  const isUserReview = (rev: ReviewApiResponse) => {
+    if (user?.id && String(rev.userId) === String(user.id)) return true;
+    const currentName = (user?.name || '').toLowerCase().trim();
+    return currentName && rev.userName?.toLowerCase().trim() === currentName;
   };
 
   const availableTags = [
@@ -82,21 +153,20 @@ export const ReviewsPage: React.FC = () => {
     );
   };
 
-  const handleLike = (id: string) => {
+  const handleLike = (id: string | number) => {
     setLikedReviews((prev) => ({
       ...prev,
-      [id]: !prev[id],
+      [String(id)]: !prev[String(id)],
     }));
   };
 
-  const handleStartEdit = (rev: ReviewItem) => {
-    setEditingReviewId(rev.id);
-    setFormMessId(rev.messId);
+  const handleStartEdit = (rev: ReviewApiResponse) => {
+    setEditingReviewId(String(rev.id));
+    setFormMessId(String(rev.messId));
     setFormRating(rev.rating);
-    setFormTaste(rev.foodQuality || 5);
-    setFormHygiene(rev.hygiene || 5);
-    setFormComment(rev.comment);
-    setFormTags(rev.tags || ['Hot Phulkas', 'Clean Kitchen']);
+    setFormTaste(rev.foodQualityScore || 5);
+    setFormHygiene(rev.hygieneScore || 5);
+    setFormComment(rev.comment || '');
     setIsFormOpen(true);
     window.scrollTo({ top: 100, behavior: 'smooth' });
   };
@@ -108,76 +178,67 @@ export const ReviewsPage: React.FC = () => {
     setIsFormOpen(false);
   };
 
-  const handleDeleteReview = (id: string) => {
-    const updated = reviewsList.filter((r) => r.id !== id);
-    saveReviews(updated);
-    setDeleteConfirmId(null);
-    if (editingReviewId === id) {
-      handleCancelForm();
+  const handleDeleteReview = async (messId: string | number, reviewId: string | number) => {
+    if (!token) {
+      showToast('Please log in with your student account to manage your reviews', 'error');
+      return;
     }
-    showToast('Your review was deleted successfully 🗑️', 'info');
+    try {
+      await deleteReviewApi(token, messId, reviewId);
+      setDeleteConfirmId(null);
+      if (editingReviewId === String(reviewId)) {
+        handleCancelForm();
+      }
+      showToast('Your review was deleted successfully 🗑️', 'info');
+      setRefreshTrigger((prev) => prev + 1);
+    } catch (err: any) {
+      showToast(err.message || 'Failed to delete review', 'error');
+    }
   };
 
-  const handleReviewSubmit = (e: React.FormEvent) => {
+  const handleReviewSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formComment.trim()) {
       showToast('Please enter your review comments', 'error');
       return;
     }
 
-    const selectedMess = mockMesses.find((m) => m.id === formMessId) || mockMesses[0];
-
-    // EDIT MODE
-    if (editingReviewId) {
-      const updated = reviewsList.map((r) => {
-        if (r.id === editingReviewId) {
-          return {
-            ...r,
-            messId: formMessId,
-            messName: selectedMess.name,
-            rating: formRating,
-            foodQuality: formTaste,
-            hygiene: formHygiene,
-            comment: formComment,
-            tags: formTags,
-            date: new Date().toISOString().split('T')[0] + ' (Edited)',
-          };
-        }
-        return r;
-      });
-      saveReviews(updated);
-      setEditingReviewId(null);
-      setFormComment('');
-      setIsFormOpen(false);
-      showToast('Your review has been updated! ✏️', 'success');
+    if (!token) {
+      showToast('Please log in with your student account to submit a review', 'error');
       return;
     }
 
-    // CREATE MODE
-    const newRev: ReviewItem = {
-      id: 'rev-' + Date.now(),
-      messId: formMessId,
-      messName: selectedMess.name,
-      userName: user?.name || 'Rahul Patil',
-      college: user?.college || 'COEP Technological University',
-      rating: formRating,
-      date: new Date().toISOString().split('T')[0],
-      foodQuality: formTaste,
-      hygiene: formHygiene,
-      valueForMoney: 5,
-      comment: formComment,
-      likes: 0,
-      tags: formTags,
-    };
+    const targetMessId = formMessId || (messes[0] ? String(messes[0].id) : '1');
 
-    saveReviews([newRev, ...reviewsList]);
-    setFormComment('');
-    setIsFormOpen(false);
-    showToast('Your student review has been posted! Thank you ⭐', 'success');
+    setIsSubmitting(true);
+    try {
+      if (editingReviewId) {
+        await updateReviewApi(token, targetMessId, editingReviewId, {
+          rating: formRating,
+          comment: formComment.trim(),
+          foodQualityScore: formTaste,
+          hygieneScore: formHygiene,
+        });
+        showToast('Your review has been updated! ✏️', 'success');
+      } else {
+        await submitReviewApi(token, targetMessId, {
+          rating: formRating,
+          comment: formComment.trim(),
+          foodQualityScore: formTaste,
+          hygieneScore: formHygiene,
+        });
+        showToast('Your student review has been posted! Thank you ⭐', 'success');
+      }
+      handleCancelForm();
+      setRefreshTrigger((prev) => prev + 1);
+    } catch (err: any) {
+      showToast(err.message || 'Failed to submit review', 'error');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const filteredReviews = reviewsList.filter((r) => {
-    if (filterMess !== 'all' && r.messId !== filterMess) return false;
     if (filterRating > 0 && r.rating < filterRating) return false;
     return true;
   });
@@ -254,7 +315,7 @@ export const ReviewsPage: React.FC = () => {
                   value={formMessId}
                   onChange={(e) => setFormMessId(e.target.value)}
                 >
-                  {mockMesses.map((m) => (
+                  {messes.map((m) => (
                     <option key={m.id} value={m.id}>
                       {m.name}
                     </option>
@@ -338,8 +399,10 @@ export const ReviewsPage: React.FC = () => {
               <button type="button" onClick={handleCancelForm} className="btn btn-outline">
                 Cancel
               </button>
-              <button type="submit" className="btn btn-primary">
-                {editingReviewId ? (
+              <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
+                {isSubmitting ? (
+                  <span>Submitting...</span>
+                ) : editingReviewId ? (
                   <>
                     <CheckCircle2 size={15} /> Update My Review
                   </>
@@ -366,8 +429,8 @@ export const ReviewsPage: React.FC = () => {
           value={filterMess}
           onChange={(e) => setFilterMess(e.target.value)}
         >
-          <option value="all">All Mess Facilities ({mockMesses.length})</option>
-          {mockMesses.map((m) => (
+          <option value="all">All Mess Facilities ({messes.length})</option>
+          {messes.map((m) => (
             <option key={m.id} value={m.id}>
               {m.name}
             </option>
@@ -385,209 +448,237 @@ export const ReviewsPage: React.FC = () => {
           <option value={4}>4 Stars and Above</option>
         </select>
 
-        <div style={{ marginLeft: 'auto', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+        <button
+          type="button"
+          onClick={() => setRefreshTrigger((prev) => prev + 1)}
+          className="btn btn-outline btn-sm"
+          style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '4px' }}
+        >
+          <RefreshCw size={12} className={isLoading ? 'animate-spin' : ''} /> Refresh
+        </button>
+
+        <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
           Showing <strong>{filteredReviews.length}</strong> reviews
         </div>
       </div>
 
-      {/* REVIEWS LIST */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-        {filteredReviews.map((rev) => {
-          const hasLiked = !!likedReviews[rev.id];
-          const isMine = isUserReview(rev);
-          return (
-            <div
-              key={rev.id}
-              className="card"
-              style={{
-                padding: '1.5rem',
-                borderLeft: isMine ? '4px solid var(--primary)' : undefined,
-              }}
-            >
-              {/* Header */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '10px', marginBottom: '0.85rem' }}>
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: isMine ? 'var(--primary)' : 'var(--primary-light)', color: isMine ? '#ffffff' : 'var(--primary-dark)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '0.9rem' }}>
-                      {rev.userName.substring(0, 2).toUpperCase()}
-                    </div>
-                    <div>
-                      <div style={{ fontWeight: 800, fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-main)', flexWrap: 'wrap' }}>
-                        {rev.userName}
-                        {isMine && (
-                          <span
-                            style={{
-                              fontSize: '0.72rem',
-                              background: 'var(--primary-light)',
-                              color: 'var(--primary-dark)',
-                              padding: '2px 8px',
-                              borderRadius: 'var(--radius-full)',
-                              fontWeight: 800,
-                              border: '1px solid var(--success-border)',
-                            }}
-                          >
-                            Your Review
+      {/* REVIEWS LIST OR STATES */}
+      {isLoading ? (
+        <div className="card" style={{ padding: '3rem', textAlign: 'center' }}>
+          <div
+            style={{
+              width: '36px',
+              height: '36px',
+              borderRadius: '50%',
+              border: '3px solid var(--border-color)',
+              borderTopColor: 'var(--primary)',
+              animation: 'spin 0.8s linear infinite',
+              margin: '0 auto 12px',
+            }}
+          />
+          <div style={{ fontWeight: 700, color: 'var(--text-main)' }}>Loading Student Reviews...</div>
+        </div>
+      ) : filteredReviews.length === 0 ? (
+        <div className="card" style={{ padding: '3rem 1.5rem', textAlign: 'center', background: 'var(--bg-card-subtle)' }}>
+          <div style={{ fontSize: '2rem', marginBottom: '8px' }}>📝</div>
+          <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-main)', marginBottom: '6px' }}>
+            No Reviews Found
+          </h3>
+          <p style={{ fontSize: '0.88rem', color: 'var(--text-muted)', maxWidth: '420px', margin: '0 auto 1rem' }}>
+            No student dining reviews match your filter selection. Be the first to share your experience!
+          </p>
+          <button type="button" onClick={() => setIsFormOpen(true)} className="btn btn-primary btn-sm">
+            Write a Review
+          </button>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+          {filteredReviews.map((rev) => {
+            const hasLiked = !!likedReviews[String(rev.id)];
+            const isMine = isUserReview(rev);
+            const authorInitial = (rev.userName || 'S').substring(0, 2).toUpperCase();
+            const dateStr = rev.createdAt ? new Date(rev.createdAt).toLocaleDateString() : 'Recent';
+
+            return (
+              <div
+                key={rev.id}
+                className="card"
+                style={{
+                  padding: '1.5rem',
+                  borderLeft: isMine ? '4px solid var(--primary)' : undefined,
+                }}
+              >
+                {/* Header */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '10px', marginBottom: '0.85rem' }}>
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: isMine ? 'var(--primary)' : 'var(--primary-light)', color: isMine ? '#ffffff' : 'var(--primary-dark)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '0.9rem' }}>
+                        {authorInitial}
+                      </div>
+                      <div>
+                        <div style={{ fontWeight: 800, fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-main)', flexWrap: 'wrap' }}>
+                          {rev.userName || 'Student Diner'}
+                          {isMine && (
+                            <span
+                              style={{
+                                fontSize: '0.72rem',
+                                background: 'var(--primary-light)',
+                                color: 'var(--primary-dark)',
+                                padding: '2px 8px',
+                                borderRadius: 'var(--radius-full)',
+                                fontWeight: 800,
+                                border: '1px solid var(--success-border)',
+                              }}
+                            >
+                              Your Review
+                            </span>
+                          )}
+                          <span style={{ fontSize: '0.72rem', color: 'var(--primary-dark)', display: 'inline-flex', alignItems: 'center', gap: '2px', fontWeight: 700 }}>
+                            <ShieldCheck size={13} /> Verified Hosteler
                           </span>
-                        )}
-                        <span style={{ fontSize: '0.72rem', color: 'var(--primary-dark)', display: 'inline-flex', alignItems: 'center', gap: '2px', fontWeight: 700 }}>
-                          <ShieldCheck size={13} /> Verified Hosteler
-                        </span>
+                        </div>
+                        <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                          {rev.userCollege || 'Campus Hosteler'} • Reviewed on {dateStr}
+                        </div>
                       </div>
-                      <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                        {rev.college} • Reviewed on {rev.date}
-                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{ textAlign: 'right' }}>
+                    <span style={{ color: 'var(--warning)', fontWeight: 800, fontSize: '0.9rem' }}>
+                      ★ {rev.rating}
+                    </span>
+                    <div style={{ fontSize: '0.78rem', color: 'var(--primary-dark)', fontWeight: 700, marginTop: '2px' }}>
+                      {rev.messName || `Mess #${rev.messId}`}
                     </div>
                   </div>
                 </div>
 
-                <div style={{ textAlign: 'right' }}>
-                  <span style={{ color: 'var(--warning)', fontWeight: 800, fontSize: '0.9rem' }}>
-                    ★ {rev.rating}
-                  </span>
-                  <div style={{ fontSize: '0.78rem', color: 'var(--primary-dark)', fontWeight: 700, marginTop: '2px' }}>
-                    {rev.messName}
+                {/* Review Text */}
+                <p style={{ fontSize: '0.92rem', color: 'var(--text-main)', lineHeight: 1.6, marginBottom: '1rem' }}>
+                  "{rev.comment}"
+                </p>
+
+                {/* Sub-ratings & Actions */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', borderTop: '1px solid var(--border-color)', paddingTop: '0.75rem' }}>
+                  <div style={{ display: 'flex', gap: '12px', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                    {rev.foodQualityScore && <span>Taste: <strong>{rev.foodQualityScore}/5</strong></span>}
+                    {rev.hygieneScore && <span>Hygiene: <strong>{rev.hygieneScore}/5</strong></span>}
                   </div>
-                </div>
-              </div>
 
-              {/* Review Text */}
-              <p style={{ fontSize: '0.92rem', color: 'var(--text-main)', lineHeight: 1.6, marginBottom: '1rem' }}>
-                "{rev.comment}"
-              </p>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                    {/* Edit and Delete Buttons for author */}
+                    {isMine && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        {deleteConfirmId === String(rev.id) ? (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#fee2e2', padding: '3px 8px', borderRadius: 'var(--radius-sm)' }}>
+                            <span style={{ fontSize: '0.76rem', color: '#b91c1c', fontWeight: 700 }}>
+                              Delete review?
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteReview(rev.messId, rev.id)}
+                              style={{
+                                background: '#dc2626',
+                                color: '#ffffff',
+                                border: 'none',
+                                borderRadius: '4px',
+                                padding: '2px 8px',
+                                fontSize: '0.75rem',
+                                fontWeight: 700,
+                                cursor: 'pointer',
+                              }}
+                            >
+                              Yes, Delete
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setDeleteConfirmId(null)}
+                              style={{
+                                background: '#ffffff',
+                                color: 'var(--text-muted)',
+                                border: '1px solid var(--border-color)',
+                                borderRadius: '4px',
+                                padding: '2px 8px',
+                                fontSize: '0.75rem',
+                                cursor: 'pointer',
+                              }}
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        ) : (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => handleStartEdit(rev)}
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                fontSize: '0.78rem',
+                                fontWeight: 700,
+                                color: 'var(--primary-dark)',
+                                background: 'var(--primary-light)',
+                                border: '1px solid var(--success-border)',
+                                padding: '4px 10px',
+                                borderRadius: 'var(--radius-sm)',
+                                cursor: 'pointer',
+                              }}
+                              title="Edit this review"
+                            >
+                              <Pencil size={13} /> Edit
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setDeleteConfirmId(String(rev.id))}
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                fontSize: '0.78rem',
+                                fontWeight: 700,
+                                color: '#dc2626',
+                                background: '#fff1f2',
+                                border: '1px solid #fecdd3',
+                                padding: '4px 10px',
+                                borderRadius: 'var(--radius-sm)',
+                                cursor: 'pointer',
+                              }}
+                              title="Delete this review"
+                            >
+                              <Trash2 size={13} /> Delete
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    )}
 
-              {/* Tags & Action Buttons */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', borderTop: '1px solid var(--border-color)', paddingTop: '0.75rem' }}>
-                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                  {rev.tags?.map((t, i) => (
-                    <span
-                      key={i}
+                    <button
+                      type="button"
+                      onClick={() => handleLike(rev.id)}
                       style={{
-                        fontSize: '0.75rem',
-                        background: 'var(--bg-card-subtle)',
-                        border: '1px solid var(--border-color)',
-                        color: 'var(--text-muted)',
-                        padding: '2px 8px',
-                        borderRadius: 'var(--radius-sm)',
-                        fontWeight: 600
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        fontSize: '0.8rem',
+                        color: hasLiked ? 'var(--primary-dark)' : 'var(--text-muted)',
+                        fontWeight: 600,
+                        background: 'none',
+                        border: 'none',
+                        cursor: 'pointer',
                       }}
                     >
-                      #{t}
-                    </span>
-                  ))}
-                </div>
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-                  {/* Edit and Delete Buttons for author */}
-                  {isMine && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      {deleteConfirmId === rev.id ? (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#fee2e2', padding: '3px 8px', borderRadius: 'var(--radius-sm)' }}>
-                          <span style={{ fontSize: '0.76rem', color: '#b91c1c', fontWeight: 700 }}>
-                            Delete review?
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteReview(rev.id)}
-                            style={{
-                              background: '#dc2626',
-                              color: '#ffffff',
-                              border: 'none',
-                              borderRadius: '4px',
-                              padding: '2px 8px',
-                              fontSize: '0.75rem',
-                              fontWeight: 700,
-                              cursor: 'pointer',
-                            }}
-                          >
-                            Yes, Delete
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setDeleteConfirmId(null)}
-                            style={{
-                              background: '#ffffff',
-                              color: 'var(--text-muted)',
-                              border: '1px solid var(--border-color)',
-                              borderRadius: '4px',
-                              padding: '2px 8px',
-                              fontSize: '0.75rem',
-                              cursor: 'pointer',
-                            }}
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      ) : (
-                        <>
-                          <button
-                            type="button"
-                            onClick={() => handleStartEdit(rev)}
-                            style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '4px',
-                              fontSize: '0.78rem',
-                              fontWeight: 700,
-                              color: 'var(--primary-dark)',
-                              background: 'var(--primary-light)',
-                              border: '1px solid var(--success-border)',
-                              padding: '4px 10px',
-                              borderRadius: 'var(--radius-sm)',
-                              cursor: 'pointer',
-                            }}
-                            title="Edit this review"
-                          >
-                            <Pencil size={13} /> Edit
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setDeleteConfirmId(rev.id)}
-                            style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '4px',
-                              fontSize: '0.78rem',
-                              fontWeight: 700,
-                              color: '#dc2626',
-                              background: '#fff1f2',
-                              border: '1px solid #fecdd3',
-                              padding: '4px 10px',
-                              borderRadius: 'var(--radius-sm)',
-                              cursor: 'pointer',
-                            }}
-                            title="Delete this review"
-                          >
-                            <Trash2 size={13} /> Delete
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  )}
-
-                  <button
-                    type="button"
-                    onClick={() => handleLike(rev.id)}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      fontSize: '0.8rem',
-                      color: hasLiked ? 'var(--primary-dark)' : 'var(--text-muted)',
-                      fontWeight: 600,
-                      background: 'none',
-                      border: 'none',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    <ThumbsUp size={14} fill={hasLiked ? 'var(--primary)' : 'none'} color={hasLiked ? 'var(--primary)' : 'var(--text-muted)'} />
-                    Helpful ({rev.likes + (hasLiked ? 1 : 0)})
-                  </button>
+                      <ThumbsUp size={14} fill={hasLiked ? 'var(--primary)' : 'none'} color={hasLiked ? 'var(--primary)' : 'var(--text-muted)'} />
+                      Helpful ({hasLiked ? 1 : 0})
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 };

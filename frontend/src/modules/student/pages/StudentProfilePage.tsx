@@ -1,11 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   User,
   Bell,
   ShieldCheck,
   Save,
-  Key
+  Key,
+  RefreshCw,
 } from 'lucide-react';
+import {
+  getStudentProfileApi,
+  updateStudentProfileApi,
+  DietaryPreference,
+} from '../../../api/studentApi';
 import { useAuth } from '../../../context/AuthContext';
 import { useNotification } from '../../../context/NotificationContext';
 import { Badge } from '../../../components/ui/Badge';
@@ -13,6 +19,7 @@ import { Badge } from '../../../components/ui/Badge';
 export const StudentProfilePage: React.FC = () => {
   const { user, updateProfile, logout } = useAuth();
   const { showToast } = useNotification();
+  const token = user?.token || localStorage.getItem('messmap_auth_token') || '';
 
   const [formData, setFormData] = useState({
     name: user?.name || 'Rahul Patil',
@@ -24,27 +31,140 @@ export const StudentProfilePage: React.FC = () => {
     studentId: user?.studentId || 'COEP-CS-2023-89',
     lunchReminder: true,
     dinnerReminder: true,
-    sundayAlerts: true
+    sundayAlerts: true,
   });
 
   const [isEditing, setIsEditing] = useState(false);
+  const [isFetching, setIsFetching] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   const [passwords, setPasswords] = useState({ current: '', newPass: '', confirm: '' });
+
+  // Load authenticated student's real profile from GET /api/student/profile
+  useEffect(() => {
+    if (!token) return;
+    setIsFetching(true);
+
+    getStudentProfileApi(token)
+      .then((res) => {
+        if (res && res.data) {
+          const p = res.data;
+          const mappedDiet =
+            p.dietaryPreference === 'VEG'
+              ? 'Pure Veg'
+              : p.dietaryPreference === 'BOTH'
+              ? 'Veg & Non-Veg'
+              : 'Pure Veg';
+
+          setFormData((prev) => ({
+            ...prev,
+            name: p.name || prev.name,
+            email: p.email || prev.email,
+            phone: p.phone || prev.phone,
+            college: p.college || p.collegeOrLocality || prev.college,
+            hostel: p.hostel || prev.hostel,
+            dietaryPref: mappedDiet,
+          }));
+
+          updateProfile({
+            name: p.name,
+            email: p.email,
+            phone: p.phone,
+            college: p.college || p.collegeOrLocality,
+            hostel: p.hostel,
+            dietaryPref: mappedDiet,
+          });
+        }
+      })
+      .catch((err: any) => {
+        console.warn('Backend student profile fetch notice:', err?.message);
+      })
+      .finally(() => {
+        setIsFetching(false);
+      });
+  }, [token]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
     const checked = (e.target as HTMLInputElement).checked;
     setFormData((prev) => ({
       ...prev,
-      [name]: type === 'checkbox' ? checked : value
+      [name]: type === 'checkbox' ? checked : value,
     }));
   };
 
-  const handleProfileSave = (e: React.FormEvent) => {
+  const handleProfileSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    updateProfile(formData);
-    setIsEditing(false);
-    showToast('Student profile updated successfully! ✅', 'success');
+
+    if (!formData.name.trim()) {
+      showToast('Full name is required', 'error');
+      return;
+    }
+
+    if (formData.phone && formData.phone.length > 20) {
+      showToast('Phone number must not exceed 20 characters', 'error');
+      return;
+    }
+
+    let backendDiet: DietaryPreference = 'VEG';
+    if (formData.dietaryPref === 'Veg & Non-Veg' || formData.dietaryPref.includes('Non-Veg')) {
+      backendDiet = 'BOTH';
+    } else if (formData.dietaryPref === 'Pure Veg') {
+      backendDiet = 'VEG';
+    }
+
+    if (token) {
+      setIsSaving(true);
+      try {
+        const res = await updateStudentProfileApi(token, {
+          name: formData.name.trim(),
+          phone: formData.phone.trim(),
+          college: formData.college.trim(),
+          hostel: formData.hostel.trim(),
+          dietaryPreference: backendDiet,
+        });
+
+        if (res && res.data) {
+          const p = res.data;
+          const mappedDiet =
+            p.dietaryPreference === 'VEG'
+              ? 'Pure Veg'
+              : p.dietaryPreference === 'BOTH'
+              ? 'Veg & Non-Veg'
+              : 'Pure Veg';
+
+          updateProfile({
+            name: p.name,
+            phone: p.phone,
+            college: p.college,
+            hostel: p.hostel,
+            dietaryPref: mappedDiet,
+          });
+
+          setFormData((prev) => ({
+            ...prev,
+            name: p.name,
+            phone: p.phone || prev.phone,
+            college: p.college || prev.college,
+            hostel: p.hostel || prev.hostel,
+            dietaryPref: mappedDiet,
+          }));
+
+          showToast('Student profile updated successfully in backend! ✅', 'success');
+        } else {
+          showToast('Student profile saved locally', 'info');
+        }
+      } catch (err: any) {
+        showToast(err.message || 'Failed to update student profile on backend', 'error');
+      } finally {
+        setIsSaving(false);
+        setIsEditing(false);
+      }
+    } else {
+      updateProfile(formData);
+      setIsEditing(false);
+      showToast('Student profile updated locally! ✅', 'success');
+    }
   };
 
   const handlePasswordSubmit = (e: React.FormEvent) => {
@@ -231,8 +351,8 @@ export const StudentProfilePage: React.FC = () => {
 
           {isEditing && (
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1rem' }}>
-              <button type="submit" className="btn btn-primary">
-                <Save size={16} /> Save Profile Changes
+              <button type="submit" className="btn btn-primary" disabled={isSaving}>
+                <Save size={16} /> {isSaving ? 'Saving Changes...' : 'Save Profile Changes'}
               </button>
             </div>
           )}
