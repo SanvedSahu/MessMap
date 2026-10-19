@@ -535,3 +535,66 @@ export async function updateMessPricingApi(
   }
   return data;
 }
+
+export interface MessVerificationStatusData {
+  messId: number;
+  messName: string;
+  status: 'DRAFT' | 'PENDING' | 'APPROVED' | 'REJECTED' | 'UNDER_REVIEW' | 'SUSPENDED';
+  rejectionReason?: string;
+  adminRemarks?: string;
+  canSubmit: boolean;
+  missingFields: string[];
+  updatedAt?: string;
+  createdAt?: string;
+}
+
+/**
+ * Submit authenticated owner's mess listing for admin verification.
+ */
+export async function submitMessVerificationApi(
+  token: string,
+  messId?: number
+): Promise<StandardApiResponse<MessVerificationStatusData>> {
+  const url = messId
+    ? `${API_BASE_URL}/owner/mess/${messId}/submit-verification`
+    : `${API_BASE_URL}/owner/mess/submit-verification`;
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: messId ? JSON.stringify({ messId }) : undefined,
+  });
+
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.message || 'Failed to submit mess for verification.');
+  }
+  return data;
+}
+
+/**
+ * Retrieve verification status and admin feedback for authenticated owner's mess listing.
+ */
+export async function getMessVerificationStatusApi(
+  token: string,
+  messId?: number
+): Promise<StandardApiResponse<MessVerificationStatusData>> {
+  const url = messId
+    ? `${API_BASE_URL}/owner/mess/${messId}/verification-status`
+    : `${API_BASE_URL}/owner/mess/verification-status`;
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.message || 'Failed to fetch verification status.');
+  }
+  return data;
+}
