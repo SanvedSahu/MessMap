@@ -20,7 +20,8 @@ import java.math.BigDecimal;
         indexes = {
                 @Index(name = "idx_menu_items_mess_id", columnList = "mess_id"),
                 @Index(name = "idx_menu_items_meal_type", columnList = "meal_type"),
-                @Index(name = "idx_menu_items_available", columnList = "is_available")
+                @Index(name = "idx_menu_items_available", columnList = "is_available"),
+                @Index(name = "idx_menu_items_day_of_week", columnList = "day_of_week")
         }
 )
 @Getter
@@ -60,6 +61,10 @@ public class MenuItem extends BaseEntity {
     @Builder.Default
     @Column(name = "is_available", nullable = false)
     private Boolean isAvailable = true;
+
+    @Builder.Default
+    @Column(name = "is_special", nullable = false)
+    private Boolean isSpecial = false;
 
     @Size(max = 20, message = "Day of week must not exceed 20 characters")
     @Column(name = "day_of_week", length = 20)

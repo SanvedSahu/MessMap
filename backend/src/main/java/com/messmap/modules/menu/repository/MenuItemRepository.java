@@ -3,9 +3,12 @@ package com.messmap.modules.menu.repository;
 import com.messmap.modules.menu.entity.MealType;
 import com.messmap.modules.menu.entity.MenuItem;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Spring Data JPA repository for Menu Items.
@@ -15,6 +18,8 @@ public interface MenuItemRepository extends JpaRepository<MenuItem, Long> {
 
     List<MenuItem> findByMessId(Long messId);
 
+    List<MenuItem> findByMessIdOrderByDayOfWeekAscMealTypeAscNameAsc(Long messId);
+
     List<MenuItem> findByMessIdAndMealType(Long messId, MealType mealType);
 
     List<MenuItem> findByMessIdAndIsAvailableTrue(Long messId);
@@ -22,4 +27,7 @@ public interface MenuItemRepository extends JpaRepository<MenuItem, Long> {
     List<MenuItem> findByMessIdAndMealTypeAndIsAvailableTrue(Long messId, MealType mealType);
 
     long countByMessId(Long messId);
+
+    @Query("SELECT m FROM MenuItem m JOIN FETCH m.mess mess JOIN FETCH mess.owner WHERE m.id = :id")
+    Optional<MenuItem> findByIdWithMessAndOwner(@Param("id") Long id);
 }

@@ -71,6 +71,15 @@ public class CreateMessRequest {
     @DecimalMin(value = "0.0", message = "Monthly price cannot be negative")
     private BigDecimal monthlyPrice;
 
+    @DecimalMin(value = "0.0", message = "Breakfast price cannot be negative")
+    private BigDecimal breakfastPrice;
+
+    @DecimalMin(value = "0.0", message = "Lunch price cannot be negative")
+    private BigDecimal lunchPrice;
+
+    @DecimalMin(value = "0.0", message = "Dinner price cannot be negative")
+    private BigDecimal dinnerPrice;
+
     @Min(value = 0, message = "Capacity cannot be negative")
     private Integer capacity;
 

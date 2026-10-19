@@ -171,6 +171,9 @@ public class MessDiscoveryService {
                 .foodType(mess.getFoodType())
                 .dailyPrice(mess.getDailyPrice())
                 .monthlyPrice(mess.getMonthlyPrice())
+                .breakfastPrice(mess.getBreakfastPrice())
+                .lunchPrice(mess.getLunchPrice())
+                .dinnerPrice(mess.getDinnerPrice())
                 .status(mess.getStatus().name())
                 .operatingStatus(mess.getOperatingStatus())
                 .openingTime(mess.getOpeningTime())
@@ -282,15 +285,7 @@ public class MessDiscoveryService {
     }
 
     private MenuItemDto mapToMenuItemDto(MenuItem item) {
-        return MenuItemDto.builder()
-                .id(item.getId())
-                .name(item.getName())
-                .description(item.getDescription())
-                .mealType(item.getMealType())
-                .price(item.getPrice())
-                .isAvailable(item.getIsAvailable())
-                .dayOfWeek(item.getDayOfWeek())
-                .build();
+        return MenuItemDto.fromEntity(item);
     }
 
     private String resolveHeroImage(Mess mess, List<String> gallery) {

@@ -73,6 +73,9 @@ public class OwnerMessService {
                 .foodType(foodType)
                 .dailyPrice(request.getDailyPrice())
                 .monthlyPrice(request.getMonthlyPrice())
+                .breakfastPrice(request.getBreakfastPrice())
+                .lunchPrice(request.getLunchPrice())
+                .dinnerPrice(request.getDinnerPrice())
                 .capacity(request.getCapacity())
                 .latitude(request.getLatitude())
                 .longitude(request.getLongitude())
@@ -180,6 +183,15 @@ public class OwnerMessService {
         }
         if (request.getMonthlyPrice() != null) {
             mess.setMonthlyPrice(request.getMonthlyPrice());
+        }
+        if (request.getBreakfastPrice() != null) {
+            mess.setBreakfastPrice(request.getBreakfastPrice());
+        }
+        if (request.getLunchPrice() != null) {
+            mess.setLunchPrice(request.getLunchPrice());
+        }
+        if (request.getDinnerPrice() != null) {
+            mess.setDinnerPrice(request.getDinnerPrice());
         }
         if (request.getCapacity() != null) {
             mess.setCapacity(request.getCapacity());

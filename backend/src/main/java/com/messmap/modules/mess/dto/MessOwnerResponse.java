@@ -42,6 +42,9 @@ public class MessOwnerResponse {
     private FoodType foodType;
     private BigDecimal dailyPrice;
     private BigDecimal monthlyPrice;
+    private BigDecimal breakfastPrice;
+    private BigDecimal lunchPrice;
+    private BigDecimal dinnerPrice;
     private MessStatus status;
     private OperatingStatus operatingStatus;
     private String openingTime;
@@ -101,6 +104,9 @@ public class MessOwnerResponse {
                 .foodType(mess.getFoodType())
                 .dailyPrice(mess.getDailyPrice())
                 .monthlyPrice(mess.getMonthlyPrice())
+                .breakfastPrice(mess.getBreakfastPrice())
+                .lunchPrice(mess.getLunchPrice())
+                .dinnerPrice(mess.getDinnerPrice())
                 .status(mess.getStatus())
                 .operatingStatus(mess.getOperatingStatus())
                 .openingTime(mess.getOpeningTime())
