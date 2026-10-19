@@ -108,6 +108,18 @@ public class Mess extends BaseEntity {
     @Column(name = "monthly_price", precision = 8, scale = 2)
     private BigDecimal monthlyPrice;
 
+    @DecimalMin(value = "0.0", message = "Breakfast price cannot be negative")
+    @Column(name = "breakfast_price", precision = 8, scale = 2)
+    private BigDecimal breakfastPrice;
+
+    @DecimalMin(value = "0.0", message = "Lunch price cannot be negative")
+    @Column(name = "lunch_price", precision = 8, scale = 2)
+    private BigDecimal lunchPrice;
+
+    @DecimalMin(value = "0.0", message = "Dinner price cannot be negative")
+    @Column(name = "dinner_price", precision = 8, scale = 2)
+    private BigDecimal dinnerPrice;
+
     @NotNull(message = "Status is required")
     @Enumerated(EnumType.STRING)
     @Builder.Default

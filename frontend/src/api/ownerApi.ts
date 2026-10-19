@@ -345,3 +345,193 @@ export async function updateMessAmenitiesApi(
   }
   return data;
 }
+
+export interface MenuItemData {
+  id: number;
+  name: string;
+  dishName?: string;
+  description?: string;
+  mealType: 'BREAKFAST' | 'LUNCH' | 'DINNER' | 'SPECIAL';
+  price?: number;
+  isAvailable?: boolean;
+  dayOfWeek?: string;
+  isSpecial?: boolean;
+}
+
+export interface CreateMenuItemPayload {
+  messId?: number;
+  dayOfWeek: string;
+  mealType: 'BREAKFAST' | 'LUNCH' | 'DINNER' | 'SPECIAL';
+  dishName: string;
+  name?: string;
+  description?: string;
+  price?: number;
+  isAvailable?: boolean;
+  isSpecial?: boolean;
+}
+
+export interface UpdateMenuItemPayload {
+  dayOfWeek?: string;
+  mealType?: 'BREAKFAST' | 'LUNCH' | 'DINNER' | 'SPECIAL';
+  dishName?: string;
+  name?: string;
+  description?: string;
+  price?: number;
+  isAvailable?: boolean;
+  isSpecial?: boolean;
+}
+
+export interface MessPricingData {
+  messId?: number;
+  messName?: string;
+  breakfastPrice?: number;
+  lunchPrice?: number;
+  dinnerPrice?: number;
+  dailyPrice?: number;
+  monthlyPrice?: number;
+  monthlyPassPrice?: number;
+}
+
+export interface UpdateMessPricingPayload {
+  messId?: number;
+  breakfastPrice?: number;
+  lunchPrice?: number;
+  dinnerPrice?: number;
+  dailyPrice?: number;
+  monthlyPrice?: number;
+  monthlyPassPrice?: number;
+}
+
+export interface DayMenuData {
+  dayOfWeek: string;
+  meals: Record<string, MenuItemData[]>;
+}
+
+export interface OwnerMenuResponseData {
+  messId: number;
+  messName: string;
+  pricing?: MessPricingData;
+  groupedMenu?: Record<string, Record<string, MenuItemData[]>>;
+  weeklyMenu?: DayMenuData[];
+  items?: MenuItemData[];
+}
+
+/**
+ * Retrieve the owner's menu catalog grouped by day and meal type.
+ */
+export async function getOwnerMenuApi(
+  token: string,
+  messId?: number
+): Promise<StandardApiResponse<OwnerMenuResponseData>> {
+  const url = messId ? `${API_BASE_URL}/owner/mess/${messId}/menu` : `${API_BASE_URL}/owner/mess/menu`;
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.message || 'Failed to fetch owner menu.');
+  }
+  return data;
+}
+
+/**
+ * Add a new dish to the owner's menu.
+ */
+export async function createMenuItemApi(
+  token: string,
+  payload: CreateMenuItemPayload
+): Promise<StandardApiResponse<MenuItemData>> {
+  const url = payload.messId
+    ? `${API_BASE_URL}/owner/mess/${payload.messId}/menu/items`
+    : `${API_BASE_URL}/owner/mess/menu/items`;
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.message || 'Failed to create menu item.');
+  }
+  return data;
+}
+
+/**
+ * Update an existing dish in the owner's menu.
+ */
+export async function updateMenuItemApi(
+  token: string,
+  id: number,
+  payload: UpdateMenuItemPayload
+): Promise<StandardApiResponse<MenuItemData>> {
+  const response = await fetch(`${API_BASE_URL}/owner/mess/menu/items/${id}`, {
+    method: 'PUT',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.message || 'Failed to update menu item.');
+  }
+  return data;
+}
+
+/**
+ * Delete a dish from the owner's menu.
+ */
+export async function deleteMenuItemApi(
+  token: string,
+  id: number
+): Promise<StandardApiResponse<void>> {
+  const response = await fetch(`${API_BASE_URL}/owner/mess/menu/items/${id}`, {
+    method: 'DELETE',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.message || 'Failed to delete menu item.');
+  }
+  return data;
+}
+
+/**
+ * Update meal and monthly pass pricing.
+ */
+export async function updateMessPricingApi(
+  token: string,
+  payload: UpdateMessPricingPayload,
+  messId?: number
+): Promise<StandardApiResponse<MessPricingData>> {
+  const url = messId ? `${API_BASE_URL}/owner/mess/${messId}/pricing` : `${API_BASE_URL}/owner/mess/pricing`;
+  const response = await fetch(url, {
+    method: 'PUT',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.message || 'Failed to update mess pricing.');
+  }
+  return data;
+}

@@ -37,6 +37,9 @@ public class MessDetailResponse {
     private FoodType foodType;
     private BigDecimal dailyPrice;
     private BigDecimal monthlyPrice;
+    private BigDecimal breakfastPrice;
+    private BigDecimal lunchPrice;
+    private BigDecimal dinnerPrice;
     private String status;
     private OperatingStatus operatingStatus;
     private String openingTime;
