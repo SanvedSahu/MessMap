@@ -1,10 +1,17 @@
 package com.messmap.security;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.messmap.modules.complaint.repository.ComplaintRepository;
+import com.messmap.modules.favorite.repository.FavoriteRepository;
+import com.messmap.modules.menu.repository.MenuItemRepository;
+import com.messmap.modules.mess.repository.MessImageRepository;
+import com.messmap.modules.mess.repository.MessRepository;
+import com.messmap.modules.review.repository.ReviewRepository;
 import com.messmap.modules.user.entity.Role;
 import com.messmap.modules.user.entity.User;
 import com.messmap.modules.user.entity.UserStatus;
 import com.messmap.modules.user.repository.UserRepository;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -45,6 +52,24 @@ class JwtSessionLifecycleTest {
     private ObjectMapper objectMapper;
 
     @Autowired
+    private ComplaintRepository complaintRepository;
+
+    @Autowired
+    private FavoriteRepository favoriteRepository;
+
+    @Autowired
+    private ReviewRepository reviewRepository;
+
+    @Autowired
+    private MenuItemRepository menuItemRepository;
+
+    @Autowired
+    private MessImageRepository messImageRepository;
+
+    @Autowired
+    private MessRepository messRepository;
+
+    @Autowired
     private UserRepository userRepository;
 
     @Autowired
@@ -65,7 +90,7 @@ class JwtSessionLifecycleTest {
 
     @BeforeEach
     void setUp() {
-        userRepository.deleteAll();
+        cleanUpDatabase();
 
         // 1. Seed users
         adminUser = userRepository.save(User.builder()
@@ -97,6 +122,21 @@ class JwtSessionLifecycleTest {
 
         // 3. Forged token provider with untrusted secret key
         untrustedKeyTokenProvider = new JwtTokenProvider(UNTRUSTED_SECRET, 86400000L);
+    }
+
+    @AfterEach
+    void tearDown() {
+        cleanUpDatabase();
+    }
+
+    private void cleanUpDatabase() {
+        complaintRepository.deleteAll();
+        favoriteRepository.deleteAll();
+        reviewRepository.deleteAll();
+        menuItemRepository.deleteAll();
+        messImageRepository.deleteAll();
+        messRepository.deleteAll();
+        userRepository.deleteAll();
     }
 
     // =========================================================================
