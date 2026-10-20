@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useOutletContext } from 'react-router-dom';
 import {
   UtensilsCrossed,
@@ -18,7 +18,9 @@ import {
   ShieldCheck,
   Sparkles,
   ChevronRight,
-  Store
+  Store,
+  AlertCircle,
+  AlertTriangle,
 } from 'lucide-react';
 import {
   initialDashboardStats,
@@ -32,7 +34,11 @@ import type {
 } from '../../../data/mockDashboardData';
 import { useAuth } from '../../../context/AuthContext';
 import { useMessData } from '../../../context/MessDataContext';
-import { AlertTriangle } from 'lucide-react';
+import {
+  getMessVerificationStatusApi,
+  submitMessVerificationApi,
+  type MessVerificationStatusData,
+} from '../../../api/ownerApi';
 import './DashboardPage.css';
 
 interface OutletContextType {
@@ -48,6 +54,47 @@ export const DashboardPage: React.FC = () => {
 
   const currentMess = messes.find((m) => m.id === user.messId) || messes[0];
   const messStatus = currentMess?.status || 'Approved';
+
+  // Live verification status states
+  const [verificationStatus, setVerificationStatus] = useState<MessVerificationStatusData | null>(null);
+  const [isSubmittingVerification, setIsSubmittingVerification] = useState<boolean>(false);
+  const [verificationError, setVerificationError] = useState<string | null>(null);
+  const [verificationSuccessMsg, setVerificationSuccessMsg] = useState<string | null>(null);
+
+  // Fetch live verification status from backend
+  useEffect(() => {
+    const token = localStorage.getItem('messmap_auth_token');
+    if (token) {
+      getMessVerificationStatusApi(token)
+        .then((res) => {
+          if (res?.data) {
+            setVerificationStatus(res.data);
+          }
+        })
+        .catch((err) => {
+          console.warn('Backend verification status note:', err.message);
+        });
+    }
+  }, []);
+
+  const handleSubmitVerification = async () => {
+    const token = localStorage.getItem('messmap_auth_token');
+    if (!token) return;
+    setIsSubmittingVerification(true);
+    setVerificationError(null);
+    setVerificationSuccessMsg(null);
+    try {
+      const res = await submitMessVerificationApi(token);
+      if (res?.data) {
+        setVerificationStatus(res.data);
+        setVerificationSuccessMsg('Mess submitted for admin verification! Status is now PENDING.');
+      }
+    } catch (err: any) {
+      setVerificationError(err.message || 'Failed to submit mess for verification.');
+    } finally {
+      setIsSubmittingVerification(false);
+    }
+  };
 
   // State initialized with realistic domain mock data
   const [stats, setStats] = useState<DashboardStats>(initialDashboardStats);
@@ -138,10 +185,105 @@ export const DashboardPage: React.FC = () => {
     }));
   };
 
+  const effectiveStatus = verificationStatus
+    ? verificationStatus.status
+    : (messStatus.toUpperCase() as any);
+
   return (
     <div className="dashboard-container">
-      {/* Verification Status Alert Banner */}
-      {messStatus === 'Pending' && (
+      {/* Live Verification Feedback Toasts */}
+      {verificationSuccessMsg && (
+        <div
+          style={{
+            backgroundColor: '#ecfdf5',
+            border: '1.5px solid #a7f3d0',
+            borderRadius: 'var(--radius-lg)',
+            padding: '0.85rem 1.25rem',
+            marginBottom: '1rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            color: '#065f46',
+            fontWeight: 700,
+          }}
+        >
+          <CheckCircle2 size={18} color="#059669" />
+          <span>{verificationSuccessMsg}</span>
+        </div>
+      )}
+
+      {verificationError && (
+        <div
+          style={{
+            backgroundColor: '#fef2f2',
+            border: '1.5px solid #fecaca',
+            borderRadius: 'var(--radius-lg)',
+            padding: '0.85rem 1.25rem',
+            marginBottom: '1rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            color: '#991b1b',
+            fontWeight: 700,
+          }}
+        >
+          <AlertTriangle size={18} color="#dc2626" />
+          <span>{verificationError}</span>
+        </div>
+      )}
+
+      {/* DRAFT Status Banner */}
+      {effectiveStatus === 'DRAFT' && (
+        <div
+          style={{
+            backgroundColor: '#fffbeb',
+            border: '1.5px solid #fcd34d',
+            borderRadius: 'var(--radius-lg)',
+            padding: '1.25rem',
+            marginBottom: '1.5rem',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '12px',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+            <AlertCircle size={22} color="#d97706" style={{ flexShrink: 0, marginTop: '2px' }} />
+            <div>
+              <div style={{ fontWeight: 800, color: '#92400e', fontSize: '1rem', marginBottom: '4px' }}>
+                Mess Listing Status: Draft (Not yet submitted for admin verification)
+              </div>
+              <div style={{ color: '#b45309', fontSize: '0.88rem', lineHeight: 1.5 }}>
+                Your mess profile is currently in Draft state. Please ensure operating timings and profile details are complete before submitting for admin review.
+              </div>
+              {verificationStatus?.missingFields && verificationStatus.missingFields.length > 0 && (
+                <div style={{ marginTop: '8px', color: '#b45309', fontSize: '0.85rem' }}>
+                  <strong>Required profile fields to complete: </strong>
+                  {verificationStatus.missingFields.join(', ')}
+                </div>
+              )}
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginLeft: '34px' }}>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={handleSubmitVerification}
+              disabled={isSubmittingVerification || (verificationStatus != null && !verificationStatus.canSubmit)}
+              id="btn-submit-verification"
+            >
+              {isSubmittingVerification ? 'Submitting...' : 'Submit for Admin Verification'}
+            </button>
+            {verificationStatus != null && !verificationStatus.canSubmit && (
+              <span style={{ fontSize: '0.82rem', color: '#b45309', fontWeight: 600 }}>
+                (Please configure operating timings in Mess Profile before submitting)
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* PENDING Status Banner */}
+      {effectiveStatus === 'PENDING' && (
         <div
           style={{
             backgroundColor: '#fffbeb',
@@ -167,28 +309,57 @@ export const DashboardPage: React.FC = () => {
         </div>
       )}
 
-      {messStatus === 'Rejected' && (
+      {/* REJECTED Status Banner */}
+      {effectiveStatus === 'REJECTED' && (
         <div
           style={{
             backgroundColor: '#fef2f2',
             border: '1.5px solid #fecaca',
             borderRadius: 'var(--radius-lg)',
-            padding: '1rem 1.25rem',
+            padding: '1.25rem',
             marginBottom: '1.5rem',
             display: 'flex',
-            alignItems: 'flex-start',
+            flexDirection: 'column',
             gap: '12px',
           }}
         >
-          <AlertTriangle size={20} color="#dc2626" style={{ flexShrink: 0, marginTop: '2px' }} />
-          <div>
-            <div style={{ fontWeight: 800, color: '#991b1b', fontSize: '0.95rem', marginBottom: '2px' }}>
-              Mess Registration Rejected by Admin
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+            <AlertTriangle size={22} color="#dc2626" style={{ flexShrink: 0, marginTop: '2px' }} />
+            <div>
+              <div style={{ fontWeight: 800, color: '#991b1b', fontSize: '1rem', marginBottom: '2px' }}>
+                Mess Registration Rejected by Admin
+              </div>
+              <div style={{ color: '#b91c1c', fontSize: '0.88rem', lineHeight: 1.5 }}>
+                Reason: {verificationStatus?.rejectionReason || currentMess?.rejectionReason || 'Application did not satisfy health & safety criteria.'}{' '}
+                Please update your mess details in the Profile tab and resubmit for verification.
+              </div>
+              {verificationStatus?.missingFields && verificationStatus.missingFields.length > 0 && (
+                <div style={{ marginTop: '8px', color: '#b91c1c', fontSize: '0.85rem' }}>
+                  <strong>Required profile fields to complete: </strong>
+                  {verificationStatus.missingFields.join(', ')}
+                </div>
+              )}
             </div>
-            <div style={{ color: '#b91c1c', fontSize: '0.85rem', lineHeight: 1.5 }}>
-              Reason: {currentMess?.rejectionReason || 'Application did not satisfy health & safety criteria.'}{' '}
-              Please update your mess details in the Profile tab and resubmit for verification.
-            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginLeft: '34px' }}>
+            <button
+              type="button"
+              style={{
+                backgroundColor: '#dc2626',
+                color: '#ffffff',
+                border: 'none',
+                borderRadius: 'var(--radius-md)',
+                padding: '8px 18px',
+                fontWeight: 700,
+                fontSize: '13px',
+                cursor: isSubmittingVerification ? 'not-allowed' : 'pointer',
+              }}
+              onClick={handleSubmitVerification}
+              disabled={isSubmittingVerification || (verificationStatus != null && !verificationStatus.canSubmit)}
+              id="btn-resubmit-verification"
+            >
+              {isSubmittingVerification ? 'Resubmitting...' : 'Resubmit for Verification'}
+            </button>
           </div>
         </div>
       )}
@@ -201,7 +372,16 @@ export const DashboardPage: React.FC = () => {
             <span>Mess Owner Control Center</span>
             <span className="pill-dot">•</span>
             <span className="owner-status-tag">
-              <ShieldCheck size={13} /> {messStatus === 'Approved' ? 'Verified Partner' : 'Verification Pending'}
+              <ShieldCheck size={13} />{' '}
+              {effectiveStatus === 'APPROVED'
+                ? 'Verified Partner'
+                : effectiveStatus === 'PENDING'
+                ? 'Verification Pending'
+                : effectiveStatus === 'DRAFT'
+                ? 'Draft Listing'
+                : effectiveStatus === 'REJECTED'
+                ? 'Action Required'
+                : 'Suspended'}
             </span>
           </div>
 

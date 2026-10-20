@@ -18,7 +18,15 @@ import {
   Check,
 } from 'lucide-react';
 import { useEffect } from 'react';
-import { getOwnerProfileApi, updateOwnerProfileApi } from '../../../api/ownerApi';
+import {
+  getOwnerProfileApi,
+  updateOwnerProfileApi,
+  getOwnerMessApi,
+  updateOwnerMessProfileApi,
+  createMessApi,
+  updateMessTimingsApi,
+  updateMessAmenitiesApi,
+} from '../../../api/ownerApi';
 import './ProfilePage.css';
 
 export const ProfilePage: React.FC = () => {
@@ -41,7 +49,7 @@ export const ProfilePage: React.FC = () => {
   const [phone, setPhone] = useState(savedProfile?.phone || '+91 98231 44550');
   const [email, setEmail] = useState(savedProfile?.email || 'contact@annapurnamess.com');
 
-  // Load live owner profile from backend if JWT token exists
+  // Load live owner profile and mess details from backend if JWT token exists
   useEffect(() => {
     const token = localStorage.getItem('messmap_auth_token');
     if (token) {
@@ -61,6 +69,30 @@ export const ProfilePage: React.FC = () => {
         })
         .catch((err) => {
           console.warn('Backend profile fetch note:', err.message);
+        });
+
+      getOwnerMessApi(token)
+        .then((res) => {
+          if (res?.data) {
+            const m = res.data;
+            if (m.name) setMessName(m.name);
+            if (m.address) setAddress(m.address);
+            if (m.city) setCity(m.city);
+            if (m.pincode) setPincode(m.pincode);
+            if (m.phone) setPhone(m.phone);
+            if (m.monthlyPrice != null) setMonthlyPrice(String(m.monthlyPrice));
+            if (m.dailyPrice != null) setDailyPrice(String(m.dailyPrice));
+            if (m.description) setDescription(m.description);
+            if (m.breakfastTiming) setBreakfastTiming(m.breakfastTiming);
+            if (m.lunchTiming) setLunchTiming(m.lunchTiming);
+            if (m.dinnerTiming) setDinnerTiming(m.dinnerTiming);
+            if (m.amenities && m.amenities.length > 0) {
+              setAmenities(m.amenities);
+            }
+          }
+        })
+        .catch((err) => {
+          console.warn('Backend mess profile fetch note:', err.message);
         });
     }
   }, []);
@@ -156,6 +188,44 @@ export const ProfilePage: React.FC = () => {
         await updateOwnerProfileApi(token, {
           name: ownerName,
           phone,
+        });
+        try {
+          await updateOwnerMessProfileApi(token, {
+            name: messName,
+            address,
+            city,
+            phone,
+            pincode,
+            monthlyPrice: Number(monthlyPrice) || 0,
+            dailyPrice: Number(dailyPrice) || 0,
+            description,
+          });
+        } catch (updateErr: any) {
+          if (
+            updateErr?.message?.includes('No mess profile found') ||
+            updateErr?.message?.includes('not found')
+          ) {
+            await createMessApi(token, {
+              name: messName,
+              address,
+              city,
+              phone,
+              pincode,
+              monthlyPrice: Number(monthlyPrice) || 0,
+              dailyPrice: Number(dailyPrice) || 0,
+              description,
+            });
+          } else {
+            console.warn('Update mess profile warning:', updateErr);
+          }
+        }
+        await updateMessTimingsApi(token, {
+          breakfastTiming,
+          lunchTiming,
+          dinnerTiming,
+        });
+        await updateMessAmenitiesApi(token, {
+          amenities,
         });
       }
     } catch (err: any) {

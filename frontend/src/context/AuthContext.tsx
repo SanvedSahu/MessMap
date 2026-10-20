@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { loginApi, registerOwnerApi } from '../api/authApi';
 import { loginStudentApi, registerStudentApi, DietaryPreference } from '../api/studentApi';
+import { getOwnerMessApi, createMessApi } from '../api/ownerApi';
 
 export type UserRole = 'guest' | 'student' | 'owner' | 'admin';
 
@@ -50,7 +51,21 @@ interface AuthContextType {
     hostel?: string;
     dietaryPreference?: DietaryPreference;
   }) => Promise<{ success: boolean; error?: string }>;
-  registerOwner: (data: { name: string; email: string; password?: string; phone?: string; messName?: string; messId?: string }) => void | Promise<void>;
+  registerOwner: (data: {
+    name: string;
+    email: string;
+    password?: string;
+    phone?: string;
+    messName?: string;
+    messId?: string;
+    address?: string;
+    area?: string;
+    city?: string;
+    foodType?: string;
+    monthlyPrice?: number;
+    dailyPrice?: number;
+    description?: string;
+  }) => Promise<{ success: boolean; error?: string }>;
   updateProfile: (data: Partial<AuthUser>) => void;
   logout: () => void;
   demoLogin: (role: 'student' | 'owner' | 'admin') => void;
@@ -152,6 +167,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const res = await loginApi({ email: trimmedEmail, password });
           if (res.success && res.data) {
             const apiUser = res.data.user;
+            const token = res.data.token;
+            localStorage.setItem('messmap_auth_token', token);
+
+            let messId = 'MESS-101';
+            let messName = 'Annapurna Deluxe Dining';
+            try {
+              const messRes = await getOwnerMessApi(token);
+              if (messRes.success && messRes.data) {
+                messId = String(messRes.data.id);
+                messName = messRes.data.name;
+              }
+            } catch (messErr) {
+              console.warn('Could not fetch owner primary mess on login:', messErr);
+            }
+
             const ownerUser: AuthUser = {
               id: String(apiUser.id),
               name: apiUser.name,
@@ -159,12 +189,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               phone: apiUser.phone || '+91 98231 44550',
               role: 'owner',
               isAuthenticated: true,
-              token: res.data.token,
-              messId: 'MESS-101',
-              messName: 'Annapurna Deluxe Dining',
+              token,
+              messId,
+              messName,
               avatar: apiUser.name ? apiUser.name.substring(0, 2).toUpperCase() : 'OW',
             };
-            localStorage.setItem('messmap_auth_token', res.data.token);
             setUser(ownerUser);
             return { success: true };
           }
@@ -321,9 +350,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     phone?: string;
     messName?: string;
     messId?: string;
-  }) => {
+    address?: string;
+    area?: string;
+    city?: string;
+    foodType?: string;
+    monthlyPrice?: number;
+    dailyPrice?: number;
+    description?: string;
+  }): Promise<{ success: boolean; error?: string }> => {
     let token: string | undefined;
     let userId = 'own-' + Date.now();
+    let messId = data.messId || 'MESS-' + Date.now();
+    let messName = data.messName || 'My Mess';
 
     if (data.password) {
       try {
@@ -337,8 +375,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           token = res.data.token;
           userId = String(res.data.user.id);
           localStorage.setItem('messmap_auth_token', res.data.token);
+
+          // If mess details were provided, create the mess listing on the backend
+          if (data.messName) {
+            try {
+              const messRes = await createMessApi(token, {
+                name: data.messName,
+                description: data.description || 'Homestyle hygienic dining for college students.',
+                address: data.address || 'Campus Road',
+                area: data.area || 'Campus Area',
+                city: data.city || 'Pune',
+                phone: data.phone,
+                foodType: data.foodType || 'VEG',
+                monthlyPrice: data.monthlyPrice || 3000,
+                dailyPrice: data.dailyPrice || 100,
+              });
+              if (messRes.success && messRes.data) {
+                messId = String(messRes.data.id);
+                messName = messRes.data.name;
+              }
+            } catch (messErr: any) {
+              console.warn('Backend mess creation warning:', messErr);
+            }
+          }
         }
-      } catch (err) {
+      } catch (err: any) {
+        if (err.message && !err.message.includes('Failed to fetch')) {
+          return { success: false, error: err.message };
+        }
         console.warn('Backend registration failed or server unreachable, falling back to local session:', err);
       }
     }
@@ -349,13 +413,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       email: data.email,
       phone: data.phone || '+91 98000 00000',
       role: 'owner',
-      messId: data.messId || 'MESS-' + Date.now(),
-      messName: data.messName || 'My Mess',
+      messId,
+      messName,
       isAuthenticated: true,
       token,
       avatar: data.name.substring(0, 2).toUpperCase(),
     };
     setUser(newOwner);
+    return { success: true };
   };
 
   const updateProfile = (data: Partial<AuthUser>) => {
