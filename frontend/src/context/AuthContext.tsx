@@ -80,6 +80,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       localStorage.setItem('messmap_auth_user', JSON.stringify(user));
       if (user.token) {
         localStorage.setItem('messmap_auth_token', user.token);
+      } else {
+        localStorage.removeItem('messmap_auth_token');
       }
     } catch {
       // ignore
@@ -90,17 +92,51 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const trimmedEmail = email.trim().toLowerCase();
 
     if (role === 'admin') {
-      // Admin authentication validation
+      if (password) {
+        try {
+          const res = await loginApi({ email: trimmedEmail, password });
+          if (res.success && res.data) {
+            const apiUser = res.data.user;
+            // Verify account holds administrator role
+            if (apiUser.role !== 'ROLE_ADMIN' && apiUser.role !== 'Admin') {
+              return { success: false, error: 'Access denied. Account does not have administrator privileges.' };
+            }
+            const token = res.data.token;
+            const adminUser: AuthUser = {
+              id: String(apiUser.id),
+              name: apiUser.name || 'Platform Administrator',
+              email: apiUser.email,
+              phone: apiUser.phone,
+              role: 'admin',
+              isAuthenticated: true,
+              token,
+              avatar: apiUser.name ? apiUser.name.substring(0, 2).toUpperCase() : 'AD',
+            };
+            localStorage.setItem('messmap_auth_token', token);
+            setUser(adminUser);
+            return { success: true };
+          }
+        } catch (err: any) {
+          if (err.message && !err.message.includes('Failed to fetch')) {
+            return { success: false, error: err.message };
+          }
+        }
+      }
+
+      // Offline demo fallback: only active when backend API is completely unreachable.
+      // Explicitly purges live JWT so this demo session cannot make unauthorized API calls.
       if (
         (trimmedEmail === 'admin@messmap.com' || trimmedEmail === 'admin') &&
-        (password === 'admin' || password === 'admin123' || !password)
+        (password === 'admin' || password === 'admin123')
       ) {
+        localStorage.removeItem('messmap_auth_token');
         const adminUser: AuthUser = {
-          id: 'adm-001',
-          name: 'Chief Admin',
+          id: 'adm-demo-001',
+          name: 'Chief Admin (Offline Demo)',
           email: 'admin@messmap.com',
           role: 'admin',
           isAuthenticated: true,
+          token: undefined, // Explicitly no backend token: blocked from live REST endpoints
           avatar: 'CA',
         };
         setUser(adminUser);
