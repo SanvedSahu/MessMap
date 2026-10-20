@@ -35,6 +35,8 @@ export interface MessItem {
   foodType: string;
   dietaryBadge?: string;
   address: string;
+  area?: string;
+  city?: string;
   landmark?: string;
   lat: number;
   lng: number;

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   UtensilsCrossed,
   Plus,
@@ -11,7 +12,9 @@ import {
   X,
   CreditCard,
   Save,
+  Store,
 } from 'lucide-react';
+import { useAuth } from '../../../context/AuthContext';
 import {
   getOwnerMenuApi,
   createMenuItemApi,
@@ -123,15 +126,21 @@ const initialMenuItems: MenuItem[] = [
 ];
 
 export const MenuPage: React.FC = () => {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const isDemoOwner = user.email === 'rajesh.sharma@annapurnamess.com' || user.messId === 'MESS-101';
+  const storageKey = `messmap_owner_menu_items_${user.id}`;
+
+  const [hasMess, setHasMess] = useState<boolean>(() => !!user.messId || isDemoOwner);
   const [activeTab, setActiveTab] = useState<'all' | 'breakfast' | 'lunch' | 'snacks' | 'dinner'>('lunch');
   const [menuItems, setMenuItems] = useState<MenuItem[]>(() => {
     try {
-      const saved = localStorage.getItem('messmap_owner_menu_items');
+      const saved = localStorage.getItem(storageKey);
       if (saved) return JSON.parse(saved);
     } catch {
       // fallback
     }
-    return initialMenuItems;
+    return isDemoOwner ? initialMenuItems : [];
   });
   const [searchQuery, setSearchQuery] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -156,7 +165,7 @@ export const MenuPage: React.FC = () => {
 
   const saveToStorage = (items: MenuItem[]) => {
     try {
-      localStorage.setItem('messmap_owner_menu_items', JSON.stringify(items));
+      localStorage.setItem(storageKey, JSON.stringify(items));
     } catch {
       // ignore
     }
@@ -174,7 +183,8 @@ export const MenuPage: React.FC = () => {
       getOwnerMenuApi(token)
         .then((res) => {
           if (res?.data) {
-            if (res.data.items && res.data.items.length > 0) {
+            setHasMess(true);
+            if (res.data.items) {
               const loaded: MenuItem[] = res.data.items.map((it: any) => ({
                 id: String(it.id),
                 name: it.dishName || it.name,
@@ -199,10 +209,19 @@ export const MenuPage: React.FC = () => {
           }
         })
         .catch((err) => {
-          console.warn('Backend menu catalog fetch note:', err.message);
+          if (
+            err.message &&
+            (err.message.includes('not found') || err.message.includes('No mess'))
+          ) {
+            if (!isDemoOwner) {
+              setHasMess(false);
+            }
+          } else {
+            console.warn('Backend menu catalog fetch note:', err.message);
+          }
         });
     }
-  }, []);
+  }, [user.id, isDemoOwner]);
 
   const handleSavePricing = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -381,6 +400,76 @@ export const MenuPage: React.FC = () => {
 
     setIsModalOpen(false);
   };
+
+  if (!hasMess) {
+    return (
+      <div className="menu-page-container">
+        <div
+          className="card"
+          style={{
+            padding: '3.5rem 2rem',
+            textAlign: 'center',
+            maxWidth: '640px',
+            margin: '2rem auto',
+            borderRadius: 'var(--radius-xl)',
+            backgroundColor: '#ffffff',
+            boxShadow: 'var(--shadow-sm)',
+            border: '1px solid var(--border-light)',
+          }}
+        >
+          <div
+            style={{
+              width: '72px',
+              height: '72px',
+              borderRadius: '50%',
+              backgroundColor: 'rgba(16, 185, 129, 0.1)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto 1.5rem',
+            }}
+          >
+            <Store size={36} color="#10b981" />
+          </div>
+          <h2
+            style={{
+              fontSize: '1.5rem',
+              fontWeight: 800,
+              marginBottom: '0.6rem',
+              color: 'var(--text-primary)',
+            }}
+          >
+            You haven't created your mess profile yet.
+          </h2>
+          <p
+            style={{
+              color: 'var(--text-muted)',
+              marginBottom: '1.75rem',
+              lineHeight: 1.6,
+              fontSize: '0.95rem',
+            }}
+          >
+            Please create your mess business profile first before adding dishes and configuring
+            subscription pricing.
+          </p>
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={() => navigate('/owner/profile')}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '0.8rem 1.8rem',
+              fontWeight: 700,
+            }}
+          >
+            <Plus size={18} /> Create Mess Profile
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const filteredItems = menuItems.filter((item) => {
     const matchesTab = activeTab === 'all' || item.mealType === activeTab;

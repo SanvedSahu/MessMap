@@ -34,8 +34,8 @@ const navItems: NavItem[] = [
   { name: 'Dashboard', path: '/owner/dashboard', icon: LayoutDashboard },
   { name: 'Manage Menu', path: '/owner/menu', icon: UtensilsCrossed },
   { name: 'Mess Profile', path: '/owner/profile', icon: Store },
-  { name: 'Customer Enquiries', path: '/owner/enquiries', icon: MessageSquareDot, badge: '3' },
-  { name: 'Reviews', path: '/owner/reviews', icon: Star, badge: '4.7' },
+  { name: 'Customer Enquiries', path: '/owner/enquiries', icon: MessageSquareDot },
+  { name: 'Reviews', path: '/owner/reviews', icon: Star },
   { name: 'Settings', path: '/owner/settings', icon: Settings },
 ];
 

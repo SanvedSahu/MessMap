@@ -19,6 +19,7 @@ import { MessCard } from '../components/MessCard';
 import { MessMapView } from '../components/MessMapView';
 import { EmptyState } from '../../../components/ui/EmptyState';
 import { MessItem } from '../../../types/student.types';
+import { POPULAR_PUNE_AREAS } from '../../../utils/geocoding';
 
 export const FindMessPage: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -42,6 +43,22 @@ export const FindMessPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshTrigger, setRefreshTrigger] = useState<number>(0);
+
+  // Dynamically compute selectable localities from popular areas and registered messes
+  const availableLocalities = useMemo(() => {
+    const locSet = new Set<string>();
+    POPULAR_PUNE_AREAS.forEach((a) => locSet.add(a));
+    backendMesses.forEach((m) => {
+      if (m.area && m.area.trim()) locSet.add(m.area.trim());
+      if (m.city && m.city.trim() && m.city.toLowerCase() !== 'pune') {
+        locSet.add(m.city.trim());
+      }
+    });
+    if (selectedLocality && selectedLocality !== 'all') {
+      locSet.add(selectedLocality);
+    }
+    return Array.from(locSet).sort();
+  }, [backendMesses, selectedLocality]);
 
   // Debounce search input to avoid duplicate / race condition requests
   useEffect(() => {
@@ -322,12 +339,11 @@ export const FindMessPage: React.FC = () => {
               }}
             >
               <option value="all">All Localities</option>
-              <option value="Shivajinagar">Shivajinagar</option>
-              <option value="Kothrud">Kothrud</option>
-              <option value="FC Road">FC Road</option>
-              <option value="Deccan">Deccan</option>
-              <option value="Model Colony">Model Colony</option>
-              <option value="Karve Nagar">Karve Nagar</option>
+              {availableLocalities.map((loc) => (
+                <option key={loc} value={loc}>
+                  {loc}
+                </option>
+              ))}
             </select>
           </div>
 

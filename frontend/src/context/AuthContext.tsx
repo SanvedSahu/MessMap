@@ -61,6 +61,9 @@ interface AuthContextType {
     address?: string;
     area?: string;
     city?: string;
+    pincode?: string;
+    latitude?: number;
+    longitude?: number;
     foodType?: string;
     monthlyPrice?: number;
     dailyPrice?: number;
@@ -170,8 +173,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             const token = res.data.token;
             localStorage.setItem('messmap_auth_token', token);
 
-            let messId = 'MESS-101';
-            let messName = 'Annapurna Deluxe Dining';
+            let messId: string | undefined = undefined;
+            let messName: string | undefined = undefined;
             try {
               const messRes = await getOwnerMessApi(token);
               if (messRes.success && messRes.data) {
@@ -179,7 +182,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 messName = messRes.data.name;
               }
             } catch (messErr) {
-              console.warn('Could not fetch owner primary mess on login:', messErr);
+              console.warn('Could not fetch owner primary mess on login (owner may not have created one yet):', messErr);
             }
 
             const ownerUser: AuthUser = {
@@ -206,17 +209,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       }
 
-      // Demo fallback for owner
+      // Demo fallback for owner: only the demo owner account inherits Annapurna mess
+      const isDemoAccount = trimmedEmail === DEMO_CREDENTIALS.owner.email;
       const ownerUser: AuthUser = {
-        id: 'own-101',
+        id: isDemoAccount ? 'own-101' : 'own-' + Date.now(),
         name: trimmedEmail.includes('@') ? trimmedEmail.split('@')[0].replace('.', ' ') : 'Mess Owner',
         email: trimmedEmail || 'rajesh.sharma@annapurnamess.com',
         phone: '+91 98231 44550',
         role: 'owner',
         isAuthenticated: true,
-        messId: 'MESS-101',
-        messName: 'Annapurna Deluxe Dining',
-        avatar: 'RS',
+        messId: isDemoAccount ? 'MESS-101' : undefined,
+        messName: isDemoAccount ? 'Annapurna Deluxe Dining' : undefined,
+        avatar: isDemoAccount ? 'RS' : 'OW',
       };
       setUser(ownerUser);
       return { success: true };
@@ -353,6 +357,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     address?: string;
     area?: string;
     city?: string;
+    pincode?: string;
+    latitude?: number;
+    longitude?: number;
     foodType?: string;
     monthlyPrice?: number;
     dailyPrice?: number;
@@ -360,8 +367,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }): Promise<{ success: boolean; error?: string }> => {
     let token: string | undefined;
     let userId = 'own-' + Date.now();
-    let messId = data.messId || 'MESS-' + Date.now();
-    let messName = data.messName || 'My Mess';
+    let messId: string | undefined = data.messId;
+    let messName: string | undefined = data.messName;
 
     if (data.password) {
       try {
@@ -385,6 +392,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 address: data.address || 'Campus Road',
                 area: data.area || 'Campus Area',
                 city: data.city || 'Pune',
+                pincode: data.pincode,
+                latitude: data.latitude,
+                longitude: data.longitude,
                 phone: data.phone,
                 foodType: data.foodType || 'VEG',
                 monthlyPrice: data.monthlyPrice || 3000,

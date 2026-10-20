@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useMessData } from '../../context/MessDataContext';
+import { geocodeAddress, POPULAR_PUNE_AREAS } from '../../utils/geocoding';
 
 export const RegisterPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -58,7 +59,14 @@ export const RegisterPage: React.FC = () => {
   // Owner specific (Mess profile details)
   const [messName, setMessName] = useState('');
   const [address, setAddress] = useState('');
-  const [area, setArea] = useState('Fergusson College Road');
+  const [area, setArea] = useState('Shivaji Nagar');
+  const [city, setCity] = useState('Pune');
+  const [pincode, setPincode] = useState('411004');
+  const [coordinates, setCoordinates] = useState<{ latitude: number; longitude: number }>({
+    latitude: 18.5204,
+    longitude: 73.8567,
+  });
+  const [geoStatus, setGeoStatus] = useState<string>('Coordinates synchronized (Pune Center)');
   const [foodType, setFoodType] = useState<'Pure Veg' | 'Veg & Non-Veg'>('Pure Veg');
   const [monthlyPrice, setMonthlyPrice] = useState('3200');
   const [dailyPrice, setDailyPrice] = useState('100');
@@ -67,6 +75,35 @@ export const RegisterPage: React.FC = () => {
 
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Synchronize coordinates whenever address, area, or city changes
+  useEffect(() => {
+    if (activeRole !== 'owner') return;
+    if (!address.trim() && !area.trim()) return;
+
+    let isMounted = true;
+    const timer = setTimeout(async () => {
+      try {
+        const geo = await geocodeAddress(address, area, city);
+        if (isMounted && geo) {
+          setCoordinates({ latitude: geo.latitude, longitude: geo.longitude });
+          if (geo.pincode && !pincode) {
+            setPincode(geo.pincode);
+          }
+          setGeoStatus(`Coordinates: ${geo.latitude.toFixed(4)}° N, ${geo.longitude.toFixed(4)}° E`);
+        }
+      } catch (e) {
+        if (isMounted) {
+          setGeoStatus('Manual location set');
+        }
+      }
+    }, 350);
+
+    return () => {
+      isMounted = false;
+      clearTimeout(timer);
+    };
+  }, [address, area, city, activeRole]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -118,17 +155,19 @@ export const RegisterPage: React.FC = () => {
 
         // 1. Submit Mess Details to Verification Queue (creates with status: 'Pending')
         const newMessId = registerMess({
-        name: messName.trim(),
-        ownerName: fullName.trim(),
-        ownerEmail: email.trim(),
-        ownerPhone: phone.trim(),
-        address: address.trim(),
-        area: area || 'Campus Area',
-        foodType: foodType,
-        monthlyPrice: Number(monthlyPrice) || 3000,
-        dailyPrice: Number(dailyPrice) || 100,
-        description: description.trim() || 'Homestyle hygienic dining for college students.',
-      });
+          name: messName.trim(),
+          ownerName: fullName.trim(),
+          ownerEmail: email.trim(),
+          ownerPhone: phone.trim(),
+          address: address.trim(),
+          area: area.trim() || 'Campus Area',
+          foodType: foodType,
+          monthlyPrice: Number(monthlyPrice) || 3000,
+          dailyPrice: Number(dailyPrice) || 100,
+          description: description.trim() || 'Homestyle hygienic dining for college students.',
+          lat: coordinates.latitude,
+          lng: coordinates.longitude,
+        } as any);
 
         // 2. Register Owner Account linked to this pending mess (backend registration + mess creation)
         const regRes = await registerOwner({
@@ -139,8 +178,11 @@ export const RegisterPage: React.FC = () => {
           messName: messName.trim(),
           messId: newMessId,
           address: address.trim(),
-          area: area || 'Campus Area',
-          city: 'Pune',
+          area: area.trim() || 'Campus Area',
+          city: city.trim() || 'Pune',
+          pincode: pincode.trim() || '411004',
+          latitude: coordinates.latitude,
+          longitude: coordinates.longitude,
           foodType: foodType === 'Pure Veg' ? 'VEG' : 'BOTH',
           monthlyPrice: Number(monthlyPrice) || 3000,
           dailyPrice: Number(dailyPrice) || 100,
@@ -158,7 +200,8 @@ export const RegisterPage: React.FC = () => {
             messId: newMessId,
             messName: messName.trim(),
             ownerName: fullName.trim(),
-            area,
+            area: area.trim(),
+            city: city.trim(),
             status: 'Pending',
           },
         });
@@ -436,7 +479,8 @@ export const RegisterPage: React.FC = () => {
                   <input
                     id="reg-password"
                     type={showPassword ? 'text' : 'password'}
-                    placeholder="Min 4 characters"
+                    placeholder="Min 6 characters"
+                    minLength={6}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     className="form-input"
@@ -467,6 +511,9 @@ export const RegisterPage: React.FC = () => {
                     {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                   </button>
                 </div>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginTop: '4px' }}>
+                  At least 6 characters
+                </span>
               </div>
 
               <div className="form-group">
@@ -476,7 +523,8 @@ export const RegisterPage: React.FC = () => {
                 <input
                   id="reg-confirmpass"
                   type={showPassword ? 'text' : 'password'}
-                  placeholder="Repeat password"
+                  placeholder="Repeat password (min 6)"
+                  minLength={6}
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   className="form-input"
@@ -520,7 +568,7 @@ export const RegisterPage: React.FC = () => {
                 />
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '1rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1.5fr', gap: '1rem' }}>
                 <div className="form-group">
                   <label className="form-label" htmlFor="reg-address">
                     Street Address *
@@ -538,22 +586,74 @@ export const RegisterPage: React.FC = () => {
 
                 <div className="form-group">
                   <label className="form-label" htmlFor="reg-area">
-                    Campus Area
+                    Area / Campus Locality *
                   </label>
-                  <select
+                  <input
                     id="reg-area"
+                    list="area-suggestions"
+                    type="text"
+                    placeholder="e.g. Shivaji Nagar, Kothrud, Hinjewadi"
                     value={area}
                     onChange={(e) => setArea(e.target.value)}
-                    className="form-select"
-                  >
-                    <option value="Fergusson College Road">Fergusson College Road</option>
-                    <option value="Shivaji Nagar">Shivaji Nagar</option>
-                    <option value="Kothrud Campus">Kothrud Campus</option>
-                    <option value="South Gate">South Gate</option>
-                    <option value="Law College Road">Law College Road</option>
-                    <option value="Deccan Gymkhana">Deccan Gymkhana</option>
-                  </select>
+                    className="form-input"
+                    required
+                  />
+                  <datalist id="area-suggestions">
+                    {POPULAR_PUNE_AREAS.map((a) => (
+                      <option key={a} value={a} />
+                    ))}
+                  </datalist>
                 </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: '1rem', marginTop: '0.25rem' }}>
+                <div className="form-group">
+                  <label className="form-label" htmlFor="reg-city">
+                    City *
+                  </label>
+                  <input
+                    id="reg-city"
+                    type="text"
+                    placeholder="e.g. Pune, Pimpri-Chinchwad, Mumbai"
+                    value={city}
+                    onChange={(e) => setCity(e.target.value)}
+                    className="form-input"
+                    required
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label" htmlFor="reg-pincode">
+                    Postal Code / Pincode
+                  </label>
+                  <input
+                    id="reg-pincode"
+                    type="text"
+                    placeholder="e.g. 411004"
+                    value={pincode}
+                    onChange={(e) => setPincode(e.target.value)}
+                    className="form-input"
+                  />
+                </div>
+              </div>
+
+              {/* Coordinates synchronization preview */}
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  background: 'var(--bg-card-subtle, #f8fafc)',
+                  padding: '8px 12px',
+                  borderRadius: '6px',
+                  border: '1px solid var(--border-color, #e2e8f0)',
+                  fontSize: '0.78rem',
+                  color: 'var(--text-muted, #64748b)',
+                  marginBottom: '1rem',
+                }}
+              >
+                <MapPin size={15} color="#10b981" />
+                <span><strong>Map Location:</strong> {geoStatus}</span>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>

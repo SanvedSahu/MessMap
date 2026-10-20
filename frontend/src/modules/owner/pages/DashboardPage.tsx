@@ -21,6 +21,7 @@ import {
   Store,
   AlertCircle,
   AlertTriangle,
+  Plus,
 } from 'lucide-react';
 import {
   initialDashboardStats,
@@ -52,14 +53,20 @@ export const DashboardPage: React.FC = () => {
   const { messes } = useMessData();
   const { isOpenStatus, toggleOpenStatus } = useOutletContext<OutletContextType>();
 
-  const currentMess = messes.find((m) => m.id === user.messId) || messes[0];
-  const messStatus = currentMess?.status || 'Approved';
+  const isDemoOwner = user.email === 'rajesh.sharma@annapurnamess.com' || user.messId === 'MESS-101';
+  // Check if owner has a mess (do not fall back to messes[0] for new accounts)
+  const currentMess = user.messId
+    ? messes.find((m) => m.id === user.messId)
+    : (isDemoOwner ? messes[0] : null);
 
   // Live verification status states
   const [verificationStatus, setVerificationStatus] = useState<MessVerificationStatusData | null>(null);
   const [isSubmittingVerification, setIsSubmittingVerification] = useState<boolean>(false);
   const [verificationError, setVerificationError] = useState<string | null>(null);
   const [verificationSuccessMsg, setVerificationSuccessMsg] = useState<string | null>(null);
+
+  const hasMess = !!currentMess || !!user.messId || (verificationStatus != null && verificationStatus.messId != null);
+  const messStatus = currentMess?.status || verificationStatus?.status || (isDemoOwner ? 'Approved' : 'Pending');
 
   // Fetch live verification status from backend
   useEffect(() => {
@@ -96,10 +103,28 @@ export const DashboardPage: React.FC = () => {
     }
   };
 
-  // State initialized with realistic domain mock data
-  const [stats, setStats] = useState<DashboardStats>(initialDashboardStats);
-  const [activities, setActivities] = useState<ActivityItem[]>(initialActivities);
-  const [enquiries, setEnquiries] = useState<DashboardEnquiry[]>(initialDashboardEnquiries);
+  // State initialized with realistic domain mock data only for demo account
+  const [stats, setStats] = useState<DashboardStats>(() => {
+    if (isDemoOwner) return initialDashboardStats;
+    return {
+      totalMenuItems: 0,
+      activeMenuItems: 0,
+      totalEnquiries: 0,
+      pendingEnquiries: 0,
+      averageRating: 0,
+      totalReviews: 0,
+      isAvailable: true,
+      activeDiners: 0,
+    };
+  });
+  const [activities, setActivities] = useState<ActivityItem[]>(() => {
+    if (isDemoOwner) return initialActivities;
+    return [];
+  });
+  const [enquiries, setEnquiries] = useState<DashboardEnquiry[]>(() => {
+    if (isDemoOwner) return initialDashboardEnquiries;
+    return [];
+  });
 
   // Modal states
   const [isAddMenuOpen, setIsAddMenuOpen] = useState(false);
@@ -188,6 +213,76 @@ export const DashboardPage: React.FC = () => {
   const effectiveStatus = verificationStatus
     ? verificationStatus.status
     : (messStatus.toUpperCase() as any);
+
+  if (!hasMess) {
+    return (
+      <div className="dashboard-container">
+        <div
+          className="card"
+          style={{
+            padding: '3.5rem 2rem',
+            textAlign: 'center',
+            maxWidth: '640px',
+            margin: '2rem auto',
+            borderRadius: 'var(--radius-xl)',
+            backgroundColor: '#ffffff',
+            boxShadow: 'var(--shadow-sm)',
+            border: '1px solid var(--border-light)',
+          }}
+        >
+          <div
+            style={{
+              width: '72px',
+              height: '72px',
+              borderRadius: '50%',
+              backgroundColor: 'rgba(16, 185, 129, 0.1)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto 1.5rem',
+            }}
+          >
+            <Store size={36} color="#10b981" />
+          </div>
+          <h2
+            style={{
+              fontSize: '1.5rem',
+              fontWeight: 800,
+              marginBottom: '0.6rem',
+              color: 'var(--text-primary)',
+            }}
+          >
+            You haven't created your mess profile yet.
+          </h2>
+          <p
+            style={{
+              color: 'var(--text-muted)',
+              marginBottom: '1.75rem',
+              lineHeight: 1.6,
+              fontSize: '0.95rem',
+            }}
+          >
+            Create your mess listing to manage daily menus, track student subscriptions, set operating
+            timings, and start receiving verified student reviews.
+          </p>
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={() => navigate('/owner/profile')}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '0.8rem 1.8rem',
+              fontWeight: 700,
+            }}
+          >
+            <Plus size={18} /> Create Mess Profile
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="dashboard-container">

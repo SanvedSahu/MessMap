@@ -558,6 +558,8 @@ export function adaptMessSummaryToMessItem(dto: MessSummaryApiResponse): MessIte
     reviewCount: dto.reviewCount || 0,
     foodType: formatFoodType(dto.foodType),
     address: dto.address || `${dto.area ? dto.area + ', ' : ''}${dto.city}`,
+    area: dto.area,
+    city: dto.city,
     landmark: dto.area || dto.city || 'Campus Area',
     lat: dto.latitude ? Number(dto.latitude) : 18.5204,
     lng: dto.longitude ? Number(dto.longitude) : 73.8567,

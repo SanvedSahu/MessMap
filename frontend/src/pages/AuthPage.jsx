@@ -37,8 +37,8 @@ export const AuthPage = () => {
     }
     if (!loginPassword.trim()) {
       errs.password = 'Please enter your password';
-    } else if (loginPassword.length < 4) {
-      errs.password = 'Password must be at least 4 characters';
+    } else if (loginPassword.length < 6) {
+      errs.password = 'Password must be at least 6 characters';
     }
     setLoginErrors(errs);
     return Object.keys(errs).length === 0;

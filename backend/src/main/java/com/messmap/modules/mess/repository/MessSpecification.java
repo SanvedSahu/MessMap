@@ -36,21 +36,23 @@ public class MessSpecification {
             predicates.add(cb.equal(root.get("status"), MessStatus.APPROVED));
 
             if (filter != null) {
-                // 2. Search keyword filter matching mess name or locality (area / address)
+                // 2. Search keyword filter matching mess name or locality (area / address / city)
                 if (filter.getSearch() != null && !filter.getSearch().trim().isEmpty()) {
                     String searchPattern = "%" + filter.getSearch().trim().toLowerCase() + "%";
                     Predicate nameMatch = cb.like(cb.lower(root.get("name")), searchPattern);
                     Predicate areaMatch = cb.like(cb.lower(root.get("area")), searchPattern);
                     Predicate addressMatch = cb.like(cb.lower(root.get("address")), searchPattern);
-                    predicates.add(cb.or(nameMatch, areaMatch, addressMatch));
+                    Predicate cityMatch = cb.like(cb.lower(root.get("city")), searchPattern);
+                    predicates.add(cb.or(nameMatch, areaMatch, addressMatch, cityMatch));
                 }
 
-                // 3. Locality filter matching area or street address
+                // 3. Locality filter matching area, street address, or city
                 if (filter.getLocality() != null && !filter.getLocality().trim().isEmpty()) {
                     String localityPattern = "%" + filter.getLocality().trim().toLowerCase() + "%";
                     Predicate areaMatch = cb.like(cb.lower(root.get("area")), localityPattern);
                     Predicate addressMatch = cb.like(cb.lower(root.get("address")), localityPattern);
-                    predicates.add(cb.or(areaMatch, addressMatch));
+                    Predicate cityMatch = cb.like(cb.lower(root.get("city")), localityPattern);
+                    predicates.add(cb.or(areaMatch, addressMatch, cityMatch));
                 }
 
                 // 4. City filter (case-insensitive exact match)

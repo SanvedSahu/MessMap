@@ -7,6 +7,9 @@ export interface OwnerMessSummary {
   address?: string;
   area?: string;
   city?: string;
+  pincode?: string;
+  latitude?: number;
+  longitude?: number;
   foodType?: string;
   monthlyPrice?: number;
   dailyPrice?: number;
