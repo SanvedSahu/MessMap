@@ -64,6 +64,8 @@ public class CreateMessRequest {
     private String email;
 
     private String foodType;
+    private String status;
+    private Boolean draft;
 
     @DecimalMin(value = "0.0", message = "Daily price cannot be negative")
     private BigDecimal dailyPrice;
