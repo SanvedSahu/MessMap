@@ -220,4 +220,35 @@ class AuthControllerTest {
                 .andExpect(jsonPath("$.data.email", is("me@messmap.com")))
                 .andExpect(jsonPath("$.data.id", is(saved.getId().intValue())));
     }
+
+    @Test
+    @DisplayName("POST /api/v1/auth/login - should authenticate seeded administrator and issue genuine JWT with ROLE_ADMIN")
+    void shouldAuthenticateAdminWithRealJwt() throws Exception {
+        User adminUser = userRepository.findByEmail("admin@messmap.com")
+                .orElseGet(() -> User.builder()
+                        .name("Platform Administrator")
+                        .email("admin@messmap.com")
+                        .build());
+        adminUser.setPassword(passwordEncoder.encode("admin"));
+        adminUser.setRole(Role.ROLE_ADMIN);
+        adminUser.setStatus(UserStatus.ACTIVE);
+        userRepository.saveAndFlush(adminUser);
+
+        LoginRequest loginRequest = LoginRequest.builder()
+                .email("admin@messmap.com")
+                .password("admin")
+                .build();
+
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(loginRequest)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success", is(true)))
+                .andExpect(jsonPath("$.message", is("Login successful")))
+                .andExpect(jsonPath("$.data.token", notNullValue()))
+                .andExpect(jsonPath("$.data.tokenType", is("Bearer")))
+                .andExpect(jsonPath("$.data.user.email", is("admin@messmap.com")))
+                .andExpect(jsonPath("$.data.user.role", is("ROLE_ADMIN")))
+                .andExpect(jsonPath("$.data.user.status", is("ACTIVE")));
+    }
 }
