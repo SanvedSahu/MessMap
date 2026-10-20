@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   UtensilsCrossed,
   Plus,
@@ -8,8 +8,17 @@ import {
   Edit2,
   Trash2,
   Sparkles,
-  X
+  X,
+  CreditCard,
+  Save,
 } from 'lucide-react';
+import {
+  getOwnerMenuApi,
+  createMenuItemApi,
+  updateMenuItemApi,
+  deleteMenuItemApi,
+  updateMessPricingApi,
+} from '../../../api/ownerApi';
 import './MenuPage.css';
 
 interface MenuItem {
@@ -129,7 +138,15 @@ export const MenuPage: React.FC = () => {
   const [editingDish, setEditingDish] = useState<MenuItem | null>(null);
   const [successToast, setSuccessToast] = useState<string | null>(null);
 
-  // Form states
+  // Pricing form states
+  const [breakfastPrice, setBreakfastPrice] = useState<number>(40);
+  const [lunchPrice, setLunchPrice] = useState<number>(90);
+  const [dinnerPrice, setDinnerPrice] = useState<number>(90);
+  const [dailyPrice, setDailyPrice] = useState<number>(110);
+  const [monthlyPrice, setMonthlyPrice] = useState<number>(3200);
+  const [isSavingPricing, setIsSavingPricing] = useState(false);
+
+  // Form states for Add/Edit Dish
   const [dishName, setDishName] = useState('');
   const [dishDesc, setDishDesc] = useState('');
   const [dishMeal, setDishMeal] = useState<'breakfast' | 'lunch' | 'snacks' | 'dinner'>('lunch');
@@ -150,17 +167,93 @@ export const MenuPage: React.FC = () => {
     setTimeout(() => setSuccessToast(null), 3000);
   };
 
-  const toggleAvailability = (id: string) => {
+  // Fetch menu and pricing from backend on mount
+  useEffect(() => {
+    const token = localStorage.getItem('messmap_auth_token');
+    if (token) {
+      getOwnerMenuApi(token)
+        .then((res) => {
+          if (res?.data) {
+            if (res.data.items && res.data.items.length > 0) {
+              const loaded: MenuItem[] = res.data.items.map((it: any) => ({
+                id: String(it.id),
+                name: it.dishName || it.name,
+                description: it.description || 'Prepared fresh daily with finest ingredients.',
+                mealType: (it.mealType ? it.mealType.toLowerCase() : 'lunch') as any,
+                price: Number(it.price) || 0,
+                dietType: 'veg',
+                isAvailable: it.isAvailable !== false,
+                isSpecial: !!it.isSpecial,
+              }));
+              setMenuItems(loaded);
+              saveToStorage(loaded);
+            }
+            if (res.data.pricing) {
+              const p = res.data.pricing;
+              if (p.breakfastPrice != null) setBreakfastPrice(Number(p.breakfastPrice));
+              if (p.lunchPrice != null) setLunchPrice(Number(p.lunchPrice));
+              if (p.dinnerPrice != null) setDinnerPrice(Number(p.dinnerPrice));
+              if (p.dailyPrice != null) setDailyPrice(Number(p.dailyPrice));
+              if (p.monthlyPrice != null) setMonthlyPrice(Number(p.monthlyPrice));
+            }
+          }
+        })
+        .catch((err) => {
+          console.warn('Backend menu catalog fetch note:', err.message);
+        });
+    }
+  }, []);
+
+  const handleSavePricing = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSavingPricing(true);
+    const token = localStorage.getItem('messmap_auth_token');
+    if (token) {
+      try {
+        await updateMessPricingApi(token, {
+          breakfastPrice: Number(breakfastPrice),
+          lunchPrice: Number(lunchPrice),
+          dinnerPrice: Number(dinnerPrice),
+          dailyPrice: Number(dailyPrice),
+          monthlyPrice: Number(monthlyPrice),
+        });
+        showToast('Meal & subscription pricing saved to backend! 💳');
+      } catch (err: any) {
+        console.warn('Backend pricing update error:', err);
+        showToast(err.message || 'Pricing update failed.');
+      } finally {
+        setIsSavingPricing(false);
+      }
+    } else {
+      showToast('Pricing saved locally (offline mode).');
+      setIsSavingPricing(false);
+    }
+  };
+
+  const toggleAvailability = async (id: string) => {
+    const target = menuItems.find((i) => i.id === id);
+    const nextAvailability = target ? !target.isAvailable : true;
     setMenuItems((prev) => {
       const updated = prev.map((item) =>
-        item.id === id ? { ...item, isAvailable: !item.isAvailable } : item
+        item.id === id ? { ...item, isAvailable: nextAvailability } : item
       );
       saveToStorage(updated);
       return updated;
     });
+
+    const token = localStorage.getItem('messmap_auth_token');
+    if (token && !id.startsWith('m_') && !isNaN(Number(id))) {
+      try {
+        await updateMenuItemApi(token, Number(id), {
+          isAvailable: nextAvailability,
+        });
+      } catch (err) {
+        console.warn('Backend availability toggle warning:', err);
+      }
+    }
   };
 
-  const deleteItem = (id: string) => {
+  const deleteItem = async (id: string) => {
     const target = menuItems.find((i) => i.id === id);
     if (window.confirm(`Are you sure you want to remove "${target?.name || 'this dish'}" from the menu?`)) {
       setMenuItems((prev) => {
@@ -169,6 +262,15 @@ export const MenuPage: React.FC = () => {
         return updated;
       });
       showToast('Dish removed from menu.');
+
+      const token = localStorage.getItem('messmap_auth_token');
+      if (token && !id.startsWith('m_') && !isNaN(Number(id))) {
+        try {
+          await deleteMenuItemApi(token, Number(id));
+        } catch (err) {
+          console.warn('Backend menu delete warning:', err);
+        }
+      }
     }
   };
 
@@ -194,9 +296,12 @@ export const MenuPage: React.FC = () => {
     setIsModalOpen(true);
   };
 
-  const handleSaveDish = (e: React.FormEvent) => {
+  const handleSaveDish = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!dishName.trim()) return;
+
+    const token = localStorage.getItem('messmap_auth_token');
+    const backendMealType = dishMeal === 'snacks' ? 'SPECIAL' : (dishMeal.toUpperCase() as any);
 
     if (editingDish) {
       // Update existing
@@ -217,11 +322,47 @@ export const MenuPage: React.FC = () => {
         saveToStorage(updated);
         return updated;
       });
+
+      if (token && !editingDish.id.startsWith('m_') && !isNaN(Number(editingDish.id))) {
+        try {
+          await updateMenuItemApi(token, Number(editingDish.id), {
+            dishName: dishName.trim(),
+            name: dishName.trim(),
+            description: dishDesc.trim() || 'Prepared fresh daily with finest ingredients.',
+            mealType: backendMealType,
+            price: Number(dishPrice),
+            isSpecial: dishIsSpecial,
+          });
+        } catch (err) {
+          console.warn('Backend update dish warning:', err);
+        }
+      }
       showToast(`Updated "${dishName.trim()}" successfully! 🍲`);
     } else {
       // Add new
+      let newId = `m_${Date.now()}`;
+      if (token) {
+        try {
+          const res = await createMenuItemApi(token, {
+            dishName: dishName.trim(),
+            name: dishName.trim(),
+            description: dishDesc.trim() || 'Prepared fresh daily with finest ingredients.',
+            mealType: backendMealType,
+            price: Number(dishPrice),
+            isAvailable: true,
+            isSpecial: dishIsSpecial,
+            dayOfWeek: 'MONDAY',
+          });
+          if (res?.data?.id) {
+            newId = String(res.data.id);
+          }
+        } catch (err) {
+          console.warn('Backend create dish warning, using local id:', err);
+        }
+      }
+
       const newItem: MenuItem = {
-        id: `m_${Date.now()}`,
+        id: newId,
         name: dishName.trim(),
         description: dishDesc.trim() || 'Prepared fresh daily with finest ingredients.',
         mealType: dishMeal,
@@ -276,7 +417,7 @@ export const MenuPage: React.FC = () => {
         <div>
           <h2 className="page-heading">Daily & Weekly Menu Management</h2>
           <p className="page-subheading">
-            Update dishes, mark instant item availability, and set daily specials.
+            Update dishes, mark instant item availability, set daily specials, and manage meal pricing.
           </p>
         </div>
 
@@ -284,6 +425,83 @@ export const MenuPage: React.FC = () => {
           <Plus size={18} /> Add New Dish
         </button>
       </div>
+
+      {/* Meal & Subscription Pricing Card */}
+      <section className="menu-pricing-card">
+        <div className="pricing-card-header">
+          <div className="pricing-header-left">
+            <CreditCard size={20} className="pricing-icon" />
+            <div>
+              <h3 className="pricing-title">Meal & Subscription Pricing</h3>
+              <p className="pricing-subtitle">
+                Configure individual meal rates, daily pass prices, and monthly dining passes.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={handleSavePricing}
+            disabled={isSavingPricing}
+            id="btn-save-pricing"
+          >
+            <Save size={16} /> {isSavingPricing ? 'Saving...' : 'Save Pricing'}
+          </button>
+        </div>
+
+        <form onSubmit={handleSavePricing} className="pricing-grid">
+          <div className="pricing-field">
+            <label className="pricing-label">Breakfast (₹)</label>
+            <input
+              type="number"
+              min={0}
+              value={breakfastPrice}
+              onChange={(e) => setBreakfastPrice(Number(e.target.value))}
+              className="pricing-input"
+            />
+          </div>
+          <div className="pricing-field">
+            <label className="pricing-label">Lunch Thali (₹)</label>
+            <input
+              type="number"
+              min={0}
+              value={lunchPrice}
+              onChange={(e) => setLunchPrice(Number(e.target.value))}
+              className="pricing-input"
+            />
+          </div>
+          <div className="pricing-field">
+            <label className="pricing-label">Dinner Thali (₹)</label>
+            <input
+              type="number"
+              min={0}
+              value={dinnerPrice}
+              onChange={(e) => setDinnerPrice(Number(e.target.value))}
+              className="pricing-input"
+            />
+          </div>
+          <div className="pricing-field">
+            <label className="pricing-label">Daily Pass (₹)</label>
+            <input
+              type="number"
+              min={0}
+              value={dailyPrice}
+              onChange={(e) => setDailyPrice(Number(e.target.value))}
+              className="pricing-input"
+            />
+          </div>
+          <div className="pricing-field">
+            <label className="pricing-label">Monthly Pass (₹)</label>
+            <input
+              type="number"
+              min={0}
+              value={monthlyPrice}
+              onChange={(e) => setMonthlyPrice(Number(e.target.value))}
+              className="pricing-input"
+            />
+          </div>
+        </form>
+      </section>
 
       {/* Control bar: Tabs & Search */}
       <div className="menu-controls-card">

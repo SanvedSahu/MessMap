@@ -251,4 +251,35 @@ class AuthControllerTest {
                 .andExpect(jsonPath("$.data.user.role", is("ROLE_ADMIN")))
                 .andExpect(jsonPath("$.data.user.status", is("ACTIVE")));
     }
+
+    @Test
+    @DisplayName("POST /api/auth/owner/register and /api/auth/owner/login - unversioned route aliases support")
+    void shouldSupportUnversionedOwnerAuthRouteAliases() throws Exception {
+        OwnerRegistrationRequest registerRequest = OwnerRegistrationRequest.builder()
+                .name("Unversioned Route Owner")
+                .email("unversioned.owner@messmap.com")
+                .password("securePassword123")
+                .phone("+91 98888 77777")
+                .build();
+
+        mockMvc.perform(post("/api/auth/owner/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(registerRequest)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.success", is(true)))
+                .andExpect(jsonPath("$.data.user.email", is("unversioned.owner@messmap.com")));
+
+        LoginRequest loginRequest = LoginRequest.builder()
+                .email("unversioned.owner@messmap.com")
+                .password("securePassword123")
+                .build();
+
+        mockMvc.perform(post("/api/auth/owner/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(loginRequest)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success", is(true)))
+                .andExpect(jsonPath("$.data.token", notNullValue()))
+                .andExpect(jsonPath("$.data.user.role", is("ROLE_MESS_OWNER")));
+    }
 }

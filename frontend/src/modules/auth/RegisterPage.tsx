@@ -130,27 +130,39 @@ export const RegisterPage: React.FC = () => {
         description: description.trim() || 'Homestyle hygienic dining for college students.',
       });
 
-      // 2. Register Owner Account linked to this pending mess
-      registerOwner({
-        name: fullName.trim(),
-        email: email.trim(),
-        password: password,
-        phone: phone.trim(),
-        messName: messName.trim(),
-        messId: newMessId,
-      });
-
-      // 3. Immediately show the Pending Approval screen as required by Section 5.C
-      navigate('/owner/pending-approval', {
-        state: {
-          messId: newMessId,
+        // 2. Register Owner Account linked to this pending mess (backend registration + mess creation)
+        const regRes = await registerOwner({
+          name: fullName.trim(),
+          email: email.trim(),
+          password: password,
+          phone: phone.trim(),
           messName: messName.trim(),
-          ownerName: fullName.trim(),
-          area,
-          status: 'Pending',
-        },
-      });
-    }
+          messId: newMessId,
+          address: address.trim(),
+          area: area || 'Campus Area',
+          city: 'Pune',
+          foodType: foodType === 'Pure Veg' ? 'VEG' : 'BOTH',
+          monthlyPrice: Number(monthlyPrice) || 3000,
+          dailyPrice: Number(dailyPrice) || 100,
+          description: description.trim() || 'Homestyle hygienic dining for college students.',
+        });
+
+        if (regRes && !regRes.success) {
+          setError(regRes.error || 'Owner registration failed.');
+          return;
+        }
+
+        // 3. Immediately show the Pending Approval screen as required by Section 5.C
+        navigate('/owner/pending-approval', {
+          state: {
+            messId: newMessId,
+            messName: messName.trim(),
+            ownerName: fullName.trim(),
+            area,
+            status: 'Pending',
+          },
+        });
+      }
   } finally {
     setIsSubmitting(false);
   }
