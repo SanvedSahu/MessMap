@@ -42,12 +42,20 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleBadRequest(
             BadRequestException ex, HttpServletRequest request) {
         log.warn("Bad request: {}", ex.getMessage());
-        ErrorResponse error = ErrorResponse.of(
-                HttpStatus.BAD_REQUEST.value(),
-                HttpStatus.BAD_REQUEST.getReasonPhrase(),
-                ex.getMessage(),
-                request.getRequestURI()
-        );
+        ErrorResponse error = ex.getDetails() != null && !ex.getDetails().isEmpty()
+                ? ErrorResponse.of(
+                        HttpStatus.BAD_REQUEST.value(),
+                        HttpStatus.BAD_REQUEST.getReasonPhrase(),
+                        ex.getMessage(),
+                        request.getRequestURI(),
+                        ex.getDetails()
+                )
+                : ErrorResponse.of(
+                        HttpStatus.BAD_REQUEST.value(),
+                        HttpStatus.BAD_REQUEST.getReasonPhrase(),
+                        ex.getMessage(),
+                        request.getRequestURI()
+                );
         return new ResponseEntity<>(error, HttpStatus.BAD_REQUEST);
     }
 

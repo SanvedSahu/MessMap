@@ -179,4 +179,69 @@ public class OwnerMessController {
         MessOwnerResponse response = ownerMessService.updateMessAmenities(userPrincipal.getId(), id, isAdmin, request);
         return ResponseEntity.ok(ApiResponse.success("Amenities updated successfully", response));
     }
+
+    /**
+     * Submit authenticated owner's mess listing for admin verification.
+     * Routes: POST /api/owner/mess/submit-verification, POST /api/v1/owner/mess/submit-verification,
+     *         POST /api/owner/messes/submit-verification, POST /api/v1/owner/messes/submit-verification
+     */
+    @PostMapping({"/api/owner/mess/submit-verification", "/api/v1/owner/mess/submit-verification", "/api/owner/messes/submit-verification", "/api/v1/owner/messes/submit-verification"})
+    public ResponseEntity<ApiResponse<MessVerificationStatusResponse>> submitVerification(
+            @AuthenticationPrincipal UserPrincipal userPrincipal,
+            @RequestBody(required = false) SubmitVerificationRequest request
+    ) {
+        boolean isAdmin = userPrincipal.getRole() == Role.ROLE_ADMIN;
+        Long targetMessId = request != null ? request.getMessId() : null;
+        log.info("POST /api/owner/mess/submit-verification: requester id={}, targetMessId={}, isAdmin={}",
+                userPrincipal.getId(), targetMessId, isAdmin);
+        MessVerificationStatusResponse response = ownerMessService.submitListingForVerification(userPrincipal.getId(), targetMessId, isAdmin);
+        return ResponseEntity.ok(ApiResponse.success("Mess listing submitted for verification successfully", response));
+    }
+
+    /**
+     * Submit specific mess listing for admin verification by ID.
+     * Routes: POST /api/owner/mess/{id}/submit-verification, POST /api/v1/owner/mess/{id}/submit-verification,
+     *         POST /api/owner/messes/{id}/submit-verification, POST /api/v1/owner/messes/{id}/submit-verification
+     */
+    @PostMapping({"/api/owner/mess/{id}/submit-verification", "/api/v1/owner/mess/{id}/submit-verification", "/api/owner/messes/{id}/submit-verification", "/api/v1/owner/messes/{id}/submit-verification"})
+    public ResponseEntity<ApiResponse<MessVerificationStatusResponse>> submitVerificationById(
+            @PathVariable("id") Long id,
+            @AuthenticationPrincipal UserPrincipal userPrincipal
+    ) {
+        boolean isAdmin = userPrincipal.getRole() == Role.ROLE_ADMIN;
+        log.info("POST /api/owner/mess/{}/submit-verification: requester id={}, isAdmin={}", id, userPrincipal.getId(), isAdmin);
+        MessVerificationStatusResponse response = ownerMessService.submitListingForVerification(userPrincipal.getId(), id, isAdmin);
+        return ResponseEntity.ok(ApiResponse.success("Mess listing submitted for verification successfully", response));
+    }
+
+    /**
+     * Retrieve verification lifecycle status, rejection remarks, and submission readiness for primary mess.
+     * Routes: GET /api/owner/mess/verification-status, GET /api/v1/owner/mess/verification-status,
+     *         GET /api/owner/messes/verification-status, GET /api/v1/owner/messes/verification-status
+     */
+    @GetMapping({"/api/owner/mess/verification-status", "/api/v1/owner/mess/verification-status", "/api/owner/messes/verification-status", "/api/v1/owner/messes/verification-status"})
+    public ResponseEntity<ApiResponse<MessVerificationStatusResponse>> getVerificationStatus(
+            @AuthenticationPrincipal UserPrincipal userPrincipal
+    ) {
+        boolean isAdmin = userPrincipal.getRole() == Role.ROLE_ADMIN;
+        log.info("GET /api/owner/mess/verification-status: requester id={}, isAdmin={}", userPrincipal.getId(), isAdmin);
+        MessVerificationStatusResponse response = ownerMessService.getVerificationStatus(userPrincipal.getId(), null, isAdmin);
+        return ResponseEntity.ok(ApiResponse.success("Mess verification status retrieved successfully", response));
+    }
+
+    /**
+     * Retrieve verification lifecycle status, rejection remarks, and submission readiness for specific mess by ID.
+     * Routes: GET /api/owner/mess/{id}/verification-status, GET /api/v1/owner/mess/{id}/verification-status,
+     *         GET /api/owner/messes/{id}/verification-status, GET /api/v1/owner/messes/{id}/verification-status
+     */
+    @GetMapping({"/api/owner/mess/{id}/verification-status", "/api/v1/owner/mess/{id}/verification-status", "/api/owner/messes/{id}/verification-status", "/api/v1/owner/messes/{id}/verification-status"})
+    public ResponseEntity<ApiResponse<MessVerificationStatusResponse>> getVerificationStatusById(
+            @PathVariable("id") Long id,
+            @AuthenticationPrincipal UserPrincipal userPrincipal
+    ) {
+        boolean isAdmin = userPrincipal.getRole() == Role.ROLE_ADMIN;
+        log.info("GET /api/owner/mess/{}/verification-status: requester id={}, isAdmin={}", id, userPrincipal.getId(), isAdmin);
+        MessVerificationStatusResponse response = ownerMessService.getVerificationStatus(userPrincipal.getId(), id, isAdmin);
+        return ResponseEntity.ok(ApiResponse.success("Mess verification status retrieved successfully", response));
+    }
 }

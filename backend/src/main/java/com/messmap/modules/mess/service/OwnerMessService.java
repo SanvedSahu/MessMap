@@ -59,6 +59,11 @@ public class OwnerMessService {
 
         FoodType foodType = request.getEffectiveFoodType();
 
+        MessStatus initialStatus = MessStatus.PENDING;
+        if ("DRAFT".equalsIgnoreCase(request.getStatus()) || Boolean.TRUE.equals(request.getDraft())) {
+            initialStatus = MessStatus.DRAFT;
+        }
+
         Mess mess = Mess.builder()
                 .owner(owner)
                 .name(request.getName().trim())
@@ -85,7 +90,7 @@ public class OwnerMessService {
                 .breakfastTiming(request.getBreakfastTiming() != null ? request.getBreakfastTiming().trim() : null)
                 .lunchTiming(request.getLunchTiming() != null ? request.getLunchTiming().trim() : null)
                 .dinnerTiming(request.getDinnerTiming() != null ? request.getDinnerTiming().trim() : null)
-                .status(MessStatus.PENDING) // Strictly server-controlled initial pending status
+                .status(initialStatus) // Server-controlled initial status (defaults to PENDING, supports DRAFT)
                 .operatingStatus(OperatingStatus.OPEN)
                 .build();
 
@@ -277,6 +282,94 @@ public class OwnerMessService {
         Mess updatedMess = messRepository.save(mess);
         log.info("Successfully updated amenities for mess id={}, facilityCount={}", updatedMess.getId(), facilities.size());
         return MessOwnerResponse.fromEntity(updatedMess);
+    }
+
+    /**
+     * Submits a mess listing for administrative verification.
+     * Allowed only when current status is DRAFT or REJECTED.
+     * Validates completeness of mandatory profile fields and meal timings.
+     * Transitions status to PENDING and clears previous rejectionReason.
+     */
+    @Transactional
+    public MessVerificationStatusResponse submitListingForVerification(Long ownerId, Long messId, boolean isAdmin) {
+        log.info("Submitting mess for verification: ownerId={}, messId={}, isAdmin={}", ownerId, messId, isAdmin);
+        Mess mess = resolveTargetMess(ownerId, messId, isAdmin, "submit for verification");
+
+        if (mess.getStatus() == MessStatus.PENDING) {
+            throw new BadRequestException("Mess listing is already submitted and pending admin verification.");
+        }
+        if (mess.getStatus() == MessStatus.APPROVED) {
+            throw new BadRequestException("Mess listing is already approved. Resubmission is not permitted.");
+        }
+        if (mess.getStatus() == MessStatus.SUSPENDED) {
+            throw new BadRequestException("Mess listing is currently suspended. Please contact administrative support.");
+        }
+        if (mess.getStatus() != MessStatus.DRAFT && mess.getStatus() != MessStatus.REJECTED) {
+            throw new BadRequestException("Only listings in DRAFT or REJECTED status can be submitted for verification. Current status: " + mess.getStatus());
+        }
+
+        List<String> missingFields = getMissingProfileFields(mess);
+        if (!missingFields.isEmpty()) {
+            throw new BadRequestException("Mess profile is incomplete for verification submission: " + String.join(", ", missingFields), missingFields);
+        }
+
+        mess.setStatus(MessStatus.PENDING);
+        mess.setRejectionReason(null);
+        Mess savedMess = messRepository.save(mess);
+
+        log.info("Successfully submitted mess id={} for verification. Status transitioned to PENDING.", savedMess.getId());
+        return MessVerificationStatusResponse.fromEntity(savedMess, java.util.Collections.emptyList());
+    }
+
+    /**
+     * Retrieves the verification status, admin feedback/rejection notes, and submission eligibility
+     * for the target mess listing.
+     */
+    @Transactional(readOnly = true)
+    public MessVerificationStatusResponse getVerificationStatus(Long ownerId, Long messId, boolean isAdmin) {
+        log.info("Fetching verification status: ownerId={}, messId={}, isAdmin={}", ownerId, messId, isAdmin);
+        Mess mess = resolveTargetMess(ownerId, messId, isAdmin, "view verification status for");
+        List<String> missingFields = getMissingProfileFields(mess);
+        return MessVerificationStatusResponse.fromEntity(mess, missingFields);
+    }
+
+    /**
+     * Evaluates profile completeness for admin verification submission.
+     * Enforces mandatory fields: name, address, city, area/locality, phone/contact, foodType,
+     * and at least one meal timing (breakfastTiming, lunchTiming, or dinnerTiming).
+     * Note: openingTime alone does not satisfy meal timing.
+     */
+    public List<String> getMissingProfileFields(Mess mess) {
+        List<String> missing = new java.util.ArrayList<>();
+
+        if (mess.getName() == null || mess.getName().isBlank()) {
+            missing.add("Mess name is required");
+        }
+        if (mess.getAddress() == null || mess.getAddress().isBlank()) {
+            missing.add("Address is required");
+        }
+        if (mess.getCity() == null || mess.getCity().isBlank()) {
+            missing.add("City is required");
+        }
+        if (mess.getArea() == null || mess.getArea().isBlank()) {
+            missing.add("Area/locality is required");
+        }
+        if (mess.getPhone() == null || mess.getPhone().isBlank()) {
+            missing.add("Contact phone is required");
+        }
+        if (mess.getFoodType() == null) {
+            missing.add("Food type is required");
+        }
+
+        boolean hasMealTiming = (mess.getBreakfastTiming() != null && !mess.getBreakfastTiming().isBlank())
+                || (mess.getLunchTiming() != null && !mess.getLunchTiming().isBlank())
+                || (mess.getDinnerTiming() != null && !mess.getDinnerTiming().isBlank());
+
+        if (!hasMealTiming) {
+            missing.add("At least one meal timing (breakfast, lunch, or dinner) is required");
+        }
+
+        return missing;
     }
 
     /**
