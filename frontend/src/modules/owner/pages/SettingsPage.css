@@ -1,0 +1,127 @@
+/* Settings Page Styles */
+.settings-page-container {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.settings-save-toast {
+  background-color: var(--green-50);
+  border: 1px solid var(--green-300);
+  color: var(--green-800);
+  padding: 12px 18px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 600;
+  font-size: 14px;
+  animation: slideInDown 0.3s ease;
+}
+
+.settings-header {
+  display: flex;
+  flex-direction: column;
+}
+
+.settings-tabs-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-bottom: 1px solid var(--border-light);
+  padding-bottom: 12px;
+}
+
+.settings-tab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 18px;
+  border-radius: var(--radius-md);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background-color: transparent;
+  transition: all var(--transition-fast);
+}
+
+.settings-tab-btn:hover {
+  background-color: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.settings-tab-btn.active {
+  background-color: var(--green-50);
+  color: var(--green-700);
+  border: 1px solid var(--green-200);
+}
+
+.settings-form-content {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.settings-section-card {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.settings-toggles-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.toggle-setting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 14px 18px;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  background-color: var(--bg-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.toggle-setting-row:hover {
+  border-color: var(--green-300);
+}
+
+.toggle-text {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.toggle-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.toggle-subtitle {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.switch-checkbox {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--green-600);
+  cursor: pointer;
+}
+
+.form-divider {
+  height: 1px;
+  background-color: var(--border-light);
+  margin: 6px 0;
+}
+
+.settings-footer-actions {
+  display: flex;
+  justify-content: flex-end;
+}
