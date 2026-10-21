@@ -9,5 +9,6 @@ public enum MessStatus {
     APPROVED,
     REJECTED,
     UNDER_REVIEW,
-    SUSPENDED
+    SUSPENDED,
+    REMOVED
 }

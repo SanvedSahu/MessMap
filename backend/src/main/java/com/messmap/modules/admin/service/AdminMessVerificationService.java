@@ -5,6 +5,7 @@ import com.messmap.common.exception.ResourceNotFoundException;
 import com.messmap.modules.admin.dto.AdminMessResponse;
 import com.messmap.modules.mess.entity.Mess;
 import com.messmap.modules.mess.entity.MessStatus;
+import com.messmap.modules.mess.entity.OperatingStatus;
 import com.messmap.modules.mess.repository.MessRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -26,6 +27,8 @@ import java.util.stream.Collectors;
 public class AdminMessVerificationService {
 
     private final MessRepository messRepository;
+    private final com.messmap.modules.mess.repository.SuspensionReviewRequestRepository suspensionReviewRequestRepository;
+    private final com.messmap.modules.user.repository.UserRepository userRepository;
 
     /**
      * Retrieves all messes currently in PENDING verification status.
@@ -168,6 +171,7 @@ public class AdminMessVerificationService {
         }
 
         mess.setStatus(MessStatus.SUSPENDED);
+        mess.setOperatingStatus(OperatingStatus.CLOSED);
         if (reason != null && !reason.trim().isEmpty()) {
             mess.setRejectionReason(reason.trim());
         }
@@ -199,6 +203,7 @@ public class AdminMessVerificationService {
         }
 
         mess.setStatus(MessStatus.APPROVED);
+        mess.setOperatingStatus(OperatingStatus.OPEN);
         mess.setRejectionReason(null);
         Mess savedMess = messRepository.save(mess);
 
@@ -208,11 +213,164 @@ public class AdminMessVerificationService {
         return AdminMessResponse.fromEntity(savedMess);
     }
 
+    /**
+     * Permanently removes a mess listing by administrative action with a mandatory reason.
+     * Transitions status to REMOVED, closes operating status, and excludes from public discovery.
+     * Prevents future reactivation by owner.
+     *
+     * @param id Mess primary key
+     * @param reason Mandatory reason for removal
+     * @return Updated AdminMessResponse DTO
+     */
+    @Transactional
+    public AdminMessResponse removeMess(Long id, String reason) {
+        String adminUser = getCurrentAdminIdentifier();
+        log.info("Admin [{}] attempting to remove mess ID: {}", adminUser, id);
+
+        if (reason == null || reason.trim().isEmpty()) {
+            throw new BadRequestException("Removal reason is required and cannot be blank");
+        }
+
+        Mess mess = messRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Mess not found with id: " + id));
+
+        if (mess.getStatus() == MessStatus.REMOVED) {
+            throw new BadRequestException("Mess is already removed");
+        }
+
+        mess.setStatus(MessStatus.REMOVED);
+        mess.setOperatingStatus(com.messmap.modules.mess.entity.OperatingStatus.CLOSED);
+        mess.setRemovalReason(reason.trim());
+        Mess savedMess = messRepository.save(mess);
+
+        // If there were any pending suspension reviews, mark them rejected/cancelled
+        List<com.messmap.modules.mess.entity.SuspensionReviewRequest> pendingReviews =
+                suspensionReviewRequestRepository.findByMessIdOrderByCreatedAtDesc(mess.getId());
+        for (var rev : pendingReviews) {
+            if (rev.getStatus() == com.messmap.modules.mess.entity.SuspensionReviewStatus.PENDING) {
+                rev.setStatus(com.messmap.modules.mess.entity.SuspensionReviewStatus.REJECTED);
+                rev.setAdminNotes("Mess was removed by administrator: " + reason.trim());
+                rev.setReviewedAt(java.time.LocalDateTime.now());
+                getCurrentAdminUser().ifPresent(rev::setReviewedBy);
+                suspensionReviewRequestRepository.save(rev);
+            }
+        }
+
+        log.info("AUDIT: Admin [{}] successfully removed mess [{}] (ID: {}). Reason: {}",
+                adminUser, savedMess.getName(), savedMess.getId(), reason.trim());
+
+        return AdminMessResponse.fromEntity(savedMess);
+    }
+
+    /**
+     * Retrieves suspension review requests, optionally filtered by status.
+     *
+     * @param status Optional filter by review status
+     * @return List of review responses
+     */
+    @Transactional(readOnly = true)
+    public List<com.messmap.modules.mess.dto.SuspensionReviewResponse> getSuspensionReviews(
+            com.messmap.modules.mess.entity.SuspensionReviewStatus status) {
+        log.info("Fetching suspension review requests with filter: {}", status != null ? status : "ALL");
+        List<com.messmap.modules.mess.entity.SuspensionReviewRequest> requests = (status != null)
+                ? suspensionReviewRequestRepository.findAllByStatusWithDetails(status)
+                : suspensionReviewRequestRepository.findAllWithDetails();
+
+        return requests.stream()
+                .map(com.messmap.modules.mess.dto.SuspensionReviewResponse::fromEntity)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Approves an owner's suspension review request and lifts the administrative suspension.
+     * Transitions mess status to APPROVED. Rejects if mess has been REMOVED.
+     *
+     * @param requestId Review request primary key
+     * @return Updated review response
+     */
+    @Transactional
+    public com.messmap.modules.mess.dto.SuspensionReviewResponse approveSuspensionReview(Long requestId) {
+        String adminIdentifier = getCurrentAdminIdentifier();
+        log.info("Admin [{}] attempting to approve suspension review request ID: {}", adminIdentifier, requestId);
+
+        com.messmap.modules.mess.entity.SuspensionReviewRequest request = suspensionReviewRequestRepository.findById(requestId)
+                .orElseThrow(() -> new ResourceNotFoundException("Suspension review request not found with id: " + requestId));
+
+        Mess mess = request.getMess();
+        if (mess.getStatus() == MessStatus.REMOVED) {
+            throw new BadRequestException("Cannot approve suspension review: The mess has been removed by an administrator.");
+        }
+
+        if (request.getStatus() != com.messmap.modules.mess.entity.SuspensionReviewStatus.PENDING) {
+            throw new BadRequestException("Only pending suspension reviews can be approved. Current status: " + request.getStatus());
+        }
+
+        // Lift suspension to APPROVED
+        mess.setStatus(MessStatus.APPROVED);
+        mess.setOperatingStatus(OperatingStatus.OPEN);
+        mess.setRejectionReason(null);
+        messRepository.save(mess);
+
+        request.setStatus(com.messmap.modules.mess.entity.SuspensionReviewStatus.APPROVED);
+        request.setReviewedAt(java.time.LocalDateTime.now());
+        getCurrentAdminUser().ifPresent(request::setReviewedBy);
+        com.messmap.modules.mess.entity.SuspensionReviewRequest saved = suspensionReviewRequestRepository.save(request);
+
+        log.info("AUDIT: Admin [{}] approved suspension review id={} for mess [{}] (ID: {}). Restored to APPROVED.",
+                adminIdentifier, requestId, mess.getName(), mess.getId());
+
+        return com.messmap.modules.mess.dto.SuspensionReviewResponse.fromEntity(saved);
+    }
+
+    /**
+     * Rejects an owner's suspension review request with mandatory explanation reason.
+     * Keeps the mess SUSPENDED.
+     *
+     * @param requestId Review request primary key
+     * @param reason Mandatory reason for rejection
+     * @return Updated review response
+     */
+    @Transactional
+    public com.messmap.modules.mess.dto.SuspensionReviewResponse rejectSuspensionReview(Long requestId, String reason) {
+        String adminIdentifier = getCurrentAdminIdentifier();
+        log.info("Admin [{}] attempting to reject suspension review request ID: {}", adminIdentifier, requestId);
+
+        if (reason == null || reason.trim().isEmpty()) {
+            throw new BadRequestException("Rejection reason is required and cannot be blank");
+        }
+
+        com.messmap.modules.mess.entity.SuspensionReviewRequest request = suspensionReviewRequestRepository.findById(requestId)
+                .orElseThrow(() -> new ResourceNotFoundException("Suspension review request not found with id: " + requestId));
+
+        if (request.getStatus() != com.messmap.modules.mess.entity.SuspensionReviewStatus.PENDING) {
+            throw new BadRequestException("Only pending suspension reviews can be rejected. Current status: " + request.getStatus());
+        }
+
+        request.setStatus(com.messmap.modules.mess.entity.SuspensionReviewStatus.REJECTED);
+        request.setAdminNotes(reason.trim());
+        request.setReviewedAt(java.time.LocalDateTime.now());
+        getCurrentAdminUser().ifPresent(request::setReviewedBy);
+        com.messmap.modules.mess.entity.SuspensionReviewRequest saved = suspensionReviewRequestRepository.save(request);
+
+        log.info("AUDIT: Admin [{}] rejected suspension review id={} for mess [{}] (ID: {}). Reason: {}",
+                adminIdentifier, requestId, request.getMess().getName(), request.getMess().getId(), reason.trim());
+
+        return com.messmap.modules.mess.dto.SuspensionReviewResponse.fromEntity(saved);
+    }
+
     private String getCurrentAdminIdentifier() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth != null && auth.isAuthenticated()) {
             return auth.getName();
         }
         return "UNKNOWN_ADMIN";
+    }
+
+    private java.util.Optional<com.messmap.modules.user.entity.User> getCurrentAdminUser() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.isAuthenticated()) {
+            return userRepository.findByEmail(auth.getName());
+        }
+        return java.util.Optional.empty();
     }
 }

@@ -12,12 +12,11 @@ import {
   Eye,
   LayoutGrid,
   List,
-  MapPin,
-  ShieldCheck,
-  Plus,
   AlertOctagon,
   RotateCcw,
   Trash2,
+  MapPin,
+  ShieldCheck,
 } from 'lucide-react';
 
 interface MessManagementProps {
@@ -27,10 +26,10 @@ interface MessManagementProps {
   onRejectMess: (id: string, reason?: string) => void;
   onSuspendMess?: (id: string) => void;
   onUnsuspendMess?: (id: string) => void;
-  onDeleteMess?: (id: string) => void;
-  onAddNewMess: (newMess: Mess) => void;
+  onDeleteMess?: (id: string, reason: string) => void;
   searchTerm: string;
   onSearchChange: (val: string) => void;
+  onNavigateToSuspensionReviews?: () => void;
 }
 
 export const MessManagement: React.FC<MessManagementProps> = ({
@@ -41,9 +40,9 @@ export const MessManagement: React.FC<MessManagementProps> = ({
   onSuspendMess,
   onUnsuspendMess,
   onDeleteMess,
-  onAddNewMess,
   searchTerm,
   onSearchChange,
+  onNavigateToSuspensionReviews,
 }) => {
   const [viewMode, setViewMode] = useState<'table' | 'card'>('table');
   const [statusFilter, setStatusFilter] = useState<string>('All');
@@ -54,6 +53,8 @@ export const MessManagement: React.FC<MessManagementProps> = ({
 
   // Confirm dialog state for Rejecting
   const [rejectingMessId, setRejectingMessId] = useState<string | null>(null);
+  // Confirm dialog state for Removing
+  const [removingMess, setRemovingMess] = useState<Mess | null>(null);
 
   // Filter logic
   const filteredMesses = useMemo(() => {
@@ -85,34 +86,6 @@ export const MessManagement: React.FC<MessManagementProps> = ({
     return filteredMesses.slice(start, start + pageSize);
   }, [filteredMesses, currentPage, pageSize]);
 
-  const handleQuickAddSample = () => {
-    const newId = `MESS-${100 + messes.length + 1}`;
-    const sampleMess: Mess = {
-      id: newId,
-      name: `Saraswati Dining Hall #${messes.length + 1}`,
-      ownerName: 'Vijay Narvekar',
-      ownerPhone: '+91 98223 99011',
-      ownerEmail: 'vijay.saraswati@gmail.com',
-      address: 'Lane 5, Near Central Library',
-      area: 'North Campus',
-      foodType: 'Pure Veg',
-      monthlyPrice: 3100,
-      dailyPrice: 115,
-      rating: 4.5,
-      reviewCount: 18,
-      status: 'Pending',
-      operatingStatus: 'Open',
-      timings: { breakfast: '7:30 AM - 9:30 AM', lunch: '12:30 PM - 3:00 PM', dinner: '8:00 PM - 10:30 PM' },
-      menuHighlights: ['Dal Makhani', 'Paneer Bhurji', 'Phulka', 'Jeera Rice'],
-      hygieneScore: 4.4,
-      registeredDate: new Date().toISOString().split('T')[0],
-      description: 'Newly registered hostel mess facility with steel thalis and pure RO water system.',
-      features: ['RO Water', 'Digital Payments', 'Unlimited Roti'],
-      capacity: 75,
-    };
-    onAddNewMess(sampleMess);
-  };
-
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
       {/* Header Bar */}
@@ -127,6 +100,16 @@ export const MessManagement: React.FC<MessManagementProps> = ({
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          {onNavigateToSuspensionReviews && (
+            <button
+              onClick={onNavigateToSuspensionReviews}
+              className="btn btn-outline btn-sm"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
+            >
+              <RotateCcw size={14} /> Suspension Reviews
+            </button>
+          )}
+
           {/* View mode toggle */}
           <div style={{ display: 'flex', backgroundColor: '#ffffff', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '2px' }}>
             <button
@@ -146,14 +129,6 @@ export const MessManagement: React.FC<MessManagementProps> = ({
               <LayoutGrid size={16} /> Cards
             </button>
           </div>
-
-          <button
-            onClick={handleQuickAddSample}
-            className="btn btn-primary"
-            style={{ gap: '0.4rem' }}
-          >
-            <Plus size={16} /> Simulate New Mess Submission
-          </button>
         </div>
       </div>
 
@@ -389,11 +364,7 @@ export const MessManagement: React.FC<MessManagementProps> = ({
                             )}
                             {onDeleteMess && (
                               <button
-                                onClick={() => {
-                                  if (window.confirm(`Are you sure you want to completely remove "${mess.name}" from the mess directory?`)) {
-                                    onDeleteMess(mess.id);
-                                  }
-                                }}
+                                onClick={() => setRemovingMess(mess)}
                                 className="btn btn-danger btn-sm"
                                 title="Remove from Directory"
                               >
@@ -494,11 +465,7 @@ export const MessManagement: React.FC<MessManagementProps> = ({
                         )}
                         {onDeleteMess && (
                           <button
-                            onClick={() => {
-                              if (window.confirm(`Are you sure you want to remove "${mess.name}" from the directory?`)) {
-                                onDeleteMess(mess.id);
-                              }
-                            }}
+                            onClick={() => setRemovingMess(mess)}
                             className="btn btn-danger btn-sm"
                           >
                             <Trash2 size={14} /> Remove
@@ -540,6 +507,24 @@ export const MessManagement: React.FC<MessManagementProps> = ({
         variant="danger"
         requiresReason={true}
         reasonPlaceholder="e.g. Incomplete FSSAI certification, failed kitchen hygiene check, inaccurate meal timings..."
+      />
+
+      {/* Confirmation Dialog for Removing Mess */}
+      <ConfirmDialog
+        isOpen={removingMess !== null}
+        onClose={() => setRemovingMess(null)}
+        onConfirm={(reason) => {
+          if (removingMess && onDeleteMess) {
+            onDeleteMess(removingMess.id, reason || '');
+            setRemovingMess(null);
+          }
+        }}
+        title="Remove Mess from Directory"
+        message={`Are you sure you want to permanently remove "${removingMess?.name}" from student discovery? This action cannot be reversed by the mess owner and requires a valid reason.`}
+        confirmText="Confirm Removal"
+        variant="danger"
+        requiresReason={true}
+        reasonPlaceholder="e.g. Repeated serious food safety violations, permanent closure, license revoked..."
       />
     </div>
   );

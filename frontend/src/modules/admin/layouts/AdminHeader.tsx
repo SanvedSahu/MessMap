@@ -56,6 +56,11 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
           title: 'Mess Verification & Directory',
           subtitle: 'Review submissions, verify health & hygiene records, manage listings',
         };
+      case 'suspension-reviews':
+        return {
+          title: 'Suspension Review Queue',
+          subtitle: 'Review owner requests to lift administrative suspensions, evaluate explanations, and approve or reject',
+        };
       case 'users':
         return {
           title: 'User Management',

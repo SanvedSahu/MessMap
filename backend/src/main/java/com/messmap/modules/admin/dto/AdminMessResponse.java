@@ -44,6 +44,7 @@ public class AdminMessResponse {
     private String openingTime;
     private String closingTime;
     private String rejectionReason;
+    private String removalReason;
     private String heroImage;
     private Integer capacity;
 
@@ -81,6 +82,7 @@ public class AdminMessResponse {
                 .openingTime(mess.getOpeningTime())
                 .closingTime(mess.getClosingTime())
                 .rejectionReason(mess.getRejectionReason())
+                .removalReason(mess.getRemovalReason())
                 .heroImage(mess.getHeroImage())
                 .capacity(mess.getCapacity())
                 .createdAt(mess.getCreatedAt())

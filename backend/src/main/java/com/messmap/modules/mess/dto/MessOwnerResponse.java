@@ -58,6 +58,7 @@ public class MessOwnerResponse {
     private String heroImage;
     private Integer capacity;
     private String rejectionReason;
+    private String removalReason;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
@@ -120,6 +121,7 @@ public class MessOwnerResponse {
                 .heroImage(mess.getHeroImage())
                 .capacity(mess.getCapacity())
                 .rejectionReason(mess.getRejectionReason())
+                .removalReason(mess.getRemovalReason())
                 .createdAt(mess.getCreatedAt())
                 .updatedAt(mess.getUpdatedAt())
                 .build();

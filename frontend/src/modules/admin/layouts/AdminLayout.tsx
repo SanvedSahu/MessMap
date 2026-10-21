@@ -10,6 +10,7 @@ interface AdminLayoutProps {
   adminProfile: AdminProfile;
   pendingApprovalsCount: number;
   openComplaintsCount: number;
+  pendingSuspensionReviewsCount?: number;
   children: React.ReactNode;
   toasts: ToastMessage[];
   onDismissToast: (id: string) => void;
@@ -23,6 +24,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
   adminProfile,
   pendingApprovalsCount,
   openComplaintsCount,
+  pendingSuspensionReviewsCount = 0,
   children,
   toasts,
   onDismissToast,
@@ -41,6 +43,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
         onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
         pendingMessesCount={pendingApprovalsCount}
         openComplaintsCount={openComplaintsCount}
+        pendingSuspensionReviewsCount={pendingSuspensionReviewsCount}
         mobileOpen={mobileSidebarOpen}
         onCloseMobile={() => setMobileSidebarOpen(false)}
       />

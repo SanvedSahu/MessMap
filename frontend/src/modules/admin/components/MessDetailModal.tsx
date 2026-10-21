@@ -24,7 +24,7 @@ interface MessDetailModalProps {
   onReject: (id: string) => void;
   onSuspend?: (id: string) => void;
   onUnsuspend?: (id: string) => void;
-  onDelete?: (id: string) => void;
+  onDelete?: (id: string, reason?: string) => void;
 }
 
 export const MessDetailModal: React.FC<MessDetailModalProps> = ({
@@ -112,8 +112,14 @@ export const MessDetailModal: React.FC<MessDetailModalProps> = ({
                 {onDelete && (
                   <button
                     onClick={() => {
-                      if (window.confirm(`Are you sure you want to completely remove "${mess.name}" from the campus directory?`)) {
-                        onDelete(mess.id);
+                      const reason = window.prompt(`Please provide a mandatory removal reason for "${mess.name}":`);
+                      if (reason !== null) {
+                        const trimmed = reason.trim();
+                        if (!trimmed) {
+                          alert('A removal reason is required and cannot be blank.');
+                          return;
+                        }
+                        onDelete(mess.id, trimmed);
                         onClose();
                       }
                     }}

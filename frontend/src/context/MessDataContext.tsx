@@ -32,7 +32,7 @@ interface MessDataContextType {
   rejectMess: (id: string, reason?: string) => void;
   suspendMess: (id: string) => void;
   unsuspendMess: (id: string) => void;
-  deleteMess: (id: string) => void;
+  deleteMess: (id: string, reason?: string) => void;
   registerMess: (messData: Partial<Mess>) => string;
   updateMess: (id: string, messData: Partial<Mess>) => void;
 }
@@ -83,7 +83,7 @@ export const MessDataProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
   }, [activities]);
 
-  const approvedMesses = messes.filter((m) => m.status === 'Approved');
+  const approvedMesses = messes.filter((m) => m.status === 'Approved' && m.operatingStatus !== 'Closed');
   const pendingMesses = messes.filter((m) => m.status === 'Pending');
 
   const approveMess = (id: string) => {

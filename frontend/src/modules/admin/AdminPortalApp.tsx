@@ -4,6 +4,7 @@ import { AdminLayout } from './layouts/AdminLayout';
 import { AdminTab } from './layouts/AdminSidebar';
 import { AdminDashboard } from './pages/AdminDashboard';
 import { MessManagement } from './pages/MessManagement';
+import { SuspensionReviewsQueue } from './pages/SuspensionReviewsQueue';
 import { UserManagement } from './pages/UserManagement';
 import { ReviewsComplaints } from './pages/ReviewsComplaints';
 import { ReportsAnalytics } from './pages/ReportsAnalytics';
@@ -40,6 +41,8 @@ import {
   rejectMessApi,
   suspendMessApi,
   unsuspendMessApi,
+  removeMessApi,
+  getSuspensionReviewsApi,
   getAdminUsersApi,
   updateUserStatusApi,
   UnauthorizedError,
@@ -56,10 +59,11 @@ function mapAdminMessToUiMess(adminMess: AdminMess): Mess {
   if (adminMess.foodType === 'VEG_NON_VEG') foodType = 'Veg & Non-Veg';
   else if (adminMess.foodType === 'JAIN') foodType = 'Jain Friendly';
 
-  let status: 'Approved' | 'Pending' | 'Rejected' | 'Suspended' = 'Pending';
+  let status: 'Approved' | 'Pending' | 'Rejected' | 'Suspended' | 'Removed' = 'Pending';
   if (adminMess.status === 'APPROVED') status = 'Approved';
   else if (adminMess.status === 'REJECTED') status = 'Rejected';
   else if (adminMess.status === 'SUSPENDED') status = 'Suspended';
+  else if (adminMess.status === 'REMOVED') status = 'Removed';
 
   return {
     id: `MESS-${adminMess.id}`,
@@ -88,6 +92,7 @@ function mapAdminMessToUiMess(adminMess: AdminMess): Mess {
     features: ['RO Purified Water', 'WiFi', 'CCTV Security'],
     capacity: adminMess.capacity || 60,
     rejectionReason: adminMess.rejectionReason,
+    removalReason: adminMess.removalReason,
   };
 }
 
@@ -137,7 +142,7 @@ export const AdminPortalApp: React.FC = () => {
   // Navigation tab state with hash sync
   const [currentTab, setCurrentTab] = useState<AdminTab>(() => {
     const hash = window.location.hash.replace('#', '') as AdminTab;
-    const validTabs: AdminTab[] = ['dashboard', 'messes', 'users', 'reviews', 'reports', 'settings'];
+    const validTabs: AdminTab[] = ['dashboard', 'messes', 'suspension-reviews', 'users', 'reviews', 'reports', 'settings'];
     return validTabs.includes(hash) ? hash : 'dashboard';
   });
 
@@ -147,6 +152,7 @@ export const AdminPortalApp: React.FC = () => {
   const [liveMesses, setLiveMesses] = useState<Mess[]>([]);
   const [liveUsers, setLiveUsers] = useState<User[]>([]);
   const [backendStats, setBackendStats] = useState<DashboardStats | null>(null);
+  const [pendingSuspensionCount, setPendingSuspensionCount] = useState<number>(0);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isLiveConnected, setIsLiveConnected] = useState<boolean>(false);
 
@@ -200,10 +206,11 @@ export const AdminPortalApp: React.FC = () => {
   const fetchLiveData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const [metricsRes, messesRes, usersRes] = await Promise.all([
+      const [metricsRes, messesRes, usersRes, reviewsRes] = await Promise.all([
         getAdminMetricsApi(user.token),
         getAdminMessesApi(undefined, user.token),
         getAdminUsersApi({ page: 0, size: 50 }, user.token),
+        getSuspensionReviewsApi('PENDING', user.token).catch(() => null),
       ]);
 
       if (metricsRes.success && messesRes.success && usersRes.success) {
@@ -212,6 +219,10 @@ export const AdminPortalApp: React.FC = () => {
 
         setLiveMesses(mappedMesses);
         setLiveUsers(mappedUsers);
+
+        if (reviewsRes?.data) {
+          setPendingSuspensionCount(reviewsRes.data.length);
+        }
 
         const openComplaints = complaints.filter((c) => c.status !== 'Resolved' && c.status !== 'Dismissed');
         setBackendStats({
@@ -385,16 +396,33 @@ export const AdminPortalApp: React.FC = () => {
     showToast(`"${messName}" unsuspended and reactivated! (Local update)`, 'success');
   };
 
-  const handleDeleteMess = (id: string) => {
+  const handleDeleteMess = async (id: string, reason?: string) => {
     const target = currentMesses.find((m) => m.id === id);
-    if (!target) return;
-    localDeleteMess(id);
-    showToast(`"${target.name}" removed from directory.`, 'info');
-  };
+    const messName = target ? target.name : 'Mess';
 
-  const handleAddNewMess = (newMess: Mess) => {
-    localRegisterMess(newMess);
-    showToast(`New mess submission "${newMess.name}" queued for verification.`, 'info');
+    const trimmedReason = reason?.trim();
+    if (!trimmedReason) {
+      showToast('A removal reason is required to remove a mess listing.', 'error');
+      return;
+    }
+
+    if (isLiveConnected) {
+      try {
+        const numericId = id.replace(/\D/g, '') || id;
+        const res = await removeMessApi(numericId, trimmedReason, user.token);
+        if (res.success) {
+          showToast(`"${res.data.name || messName}" has been removed from student discovery.`, 'info');
+          await fetchLiveData();
+          return;
+        }
+      } catch (err: any) {
+        handleApiError(err, `Failed to remove "${messName}".`);
+        return;
+      }
+    }
+
+    localDeleteMess(id);
+    showToast(`"${messName}" removed from directory. (Local update)`, 'info');
   };
 
   const handleToggleUserStatus = async (userId: string, reason?: string) => {
@@ -587,6 +615,7 @@ export const AdminPortalApp: React.FC = () => {
       adminProfile={adminProfile}
       pendingApprovalsCount={currentPendingMesses.length}
       openComplaintsCount={dynamicStats.openComplaints}
+      pendingSuspensionReviewsCount={pendingSuspensionCount}
       toasts={toasts}
       onDismissToast={dismissToast}
       searchTerm={searchTerm}
@@ -642,9 +671,17 @@ export const AdminPortalApp: React.FC = () => {
           onSuspendMess={handleSuspendMess}
           onUnsuspendMess={handleUnsuspendMess}
           onDeleteMess={handleDeleteMess}
-          onAddNewMess={handleAddNewMess}
           searchTerm={searchTerm}
           onSearchChange={setSearchTerm}
+          onNavigateToSuspensionReviews={() => handleSelectTab('suspension-reviews')}
+        />
+      )}
+
+      {currentTab === 'suspension-reviews' && (
+        <SuspensionReviewsQueue
+          token={user.token}
+          onShowToast={showToast}
+          onMessStatusUpdated={fetchLiveData}
         />
       )}
 

@@ -132,4 +132,79 @@ public class AdminMessController {
         AdminMessResponse unsuspendedMess = adminMessVerificationService.unsuspendMess(id);
         return ResponseEntity.ok(ApiResponse.success("Mess unsuspended successfully", unsuspendedMess));
     }
+
+    /**
+     * Permanently removes a mess listing from student discovery with mandatory reason.
+     * Accessible via POST /api/admin/messes/{id}/remove and DELETE /api/admin/messes/{id}.
+     *
+     * @param id Mess primary key
+     * @param request Payload containing mandatory removal reason
+     * @return Standardized ApiResponse containing removed AdminMessResponse
+     */
+    @PostMapping("/{id}/remove")
+    public ResponseEntity<ApiResponse<AdminMessResponse>> removeMess(
+            @PathVariable Long id,
+            @Valid @RequestBody com.messmap.modules.admin.dto.RemoveMessRequest request) {
+        log.info("Processing admin removal for mess ID: {}", id);
+        AdminMessResponse removedMess = adminMessVerificationService.removeMess(id, request.getReason());
+        return ResponseEntity.ok(ApiResponse.success("Mess removed successfully", removedMess));
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<ApiResponse<AdminMessResponse>> deleteMess(
+            @PathVariable Long id,
+            @Valid @RequestBody(required = false) com.messmap.modules.admin.dto.RemoveMessRequest request,
+            @RequestParam(required = false) String reason) {
+        String effectiveReason = (request != null && request.getReason() != null) ? request.getReason() : reason;
+        log.info("Processing admin DELETE removal for mess ID: {}", id);
+        AdminMessResponse removedMess = adminMessVerificationService.removeMess(id, effectiveReason);
+        return ResponseEntity.ok(ApiResponse.success("Mess removed successfully", removedMess));
+    }
+
+    /**
+     * Retrieves suspension review requests awaiting administrative decision.
+     * Accessible via GET /api/admin/messes/suspension-reviews.
+     *
+     * @param status Optional filter by SuspensionReviewStatus
+     * @return Standardized ApiResponse containing list of review requests
+     */
+    @GetMapping("/suspension-reviews")
+    public ResponseEntity<ApiResponse<List<com.messmap.modules.mess.dto.SuspensionReviewResponse>>> getSuspensionReviews(
+            @RequestParam(required = false) com.messmap.modules.mess.entity.SuspensionReviewStatus status) {
+        log.info("Processing admin request for suspension reviews with status filter: {}", status);
+        List<com.messmap.modules.mess.dto.SuspensionReviewResponse> reviews = adminMessVerificationService.getSuspensionReviews(status);
+        return ResponseEntity.ok(ApiResponse.success("Suspension review requests retrieved successfully", reviews));
+    }
+
+    /**
+     * Approves an owner's suspension review request and restores mess to APPROVED status.
+     * Accessible via POST /api/admin/messes/suspension-reviews/{id}/approve.
+     *
+     * @param id Review request primary key
+     * @return Standardized ApiResponse containing updated review details
+     */
+    @PostMapping("/suspension-reviews/{id}/approve")
+    public ResponseEntity<ApiResponse<com.messmap.modules.mess.dto.SuspensionReviewResponse>> approveSuspensionReview(
+            @PathVariable Long id) {
+        log.info("Processing admin approval for suspension review ID: {}", id);
+        com.messmap.modules.mess.dto.SuspensionReviewResponse review = adminMessVerificationService.approveSuspensionReview(id);
+        return ResponseEntity.ok(ApiResponse.success("Suspension review request approved successfully", review));
+    }
+
+    /**
+     * Rejects an owner's suspension review request with mandatory explanation.
+     * Accessible via POST /api/admin/messes/suspension-reviews/{id}/reject.
+     *
+     * @param id Review request primary key
+     * @param request Payload containing mandatory rejection explanation
+     * @return Standardized ApiResponse containing updated review details
+     */
+    @PostMapping("/suspension-reviews/{id}/reject")
+    public ResponseEntity<ApiResponse<com.messmap.modules.mess.dto.SuspensionReviewResponse>> rejectSuspensionReview(
+            @PathVariable Long id,
+            @Valid @RequestBody com.messmap.modules.admin.dto.RejectSuspensionReviewRequest request) {
+        log.info("Processing admin rejection for suspension review ID: {}", id);
+        com.messmap.modules.mess.dto.SuspensionReviewResponse review = adminMessVerificationService.rejectSuspensionReview(id, request.getReason());
+        return ResponseEntity.ok(ApiResponse.success("Suspension review request rejected", review));
+    }
 }

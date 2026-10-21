@@ -27,7 +27,12 @@ export const PendingApprovalPage: React.FC = () => {
     registeredDate: new Date().toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' }),
   };
 
-  const isRejected = currentMess.status === 'Rejected';
+  const normalizedStatus = String(currentMess.status || '').toUpperCase();
+  const isRejected = normalizedStatus === 'REJECTED';
+  const isSuspended = normalizedStatus === 'SUSPENDED';
+  const isRemoved = normalizedStatus === 'REMOVED';
+  const isDanger = isRejected || isRemoved;
+  const isWarning = isSuspended || (!isDanger && normalizedStatus !== 'APPROVED');
 
   return (
     <div
@@ -90,34 +95,57 @@ export const PendingApprovalPage: React.FC = () => {
             width: '68px',
             height: '68px',
             borderRadius: '50%',
-            backgroundColor: isRejected ? 'var(--danger-bg)' : '#fffbeb',
-            border: `2px solid ${isRejected ? 'var(--danger-border)' : '#fde68a'}`,
+            backgroundColor: isDanger ? 'var(--danger-bg)' : '#fffbeb',
+            border: `2px solid ${isDanger ? 'var(--danger-border)' : '#fde68a'}`,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             margin: '0 auto 1.5rem',
-            color: isRejected ? 'var(--danger)' : '#d97706',
+            color: isDanger ? 'var(--danger)' : '#d97706',
           }}
         >
-          {isRejected ? <AlertCircle size={36} /> : <Clock size={36} />}
+          {isDanger || isSuspended ? <AlertCircle size={36} /> : <Clock size={36} />}
         </div>
 
         <span
-          className={`badge ${isRejected ? 'badge-danger' : 'badge-warning'}`}
+          className={`badge ${isDanger ? 'badge-danger' : 'badge-warning'}`}
           style={{ fontSize: '0.82rem', padding: '5px 12px', marginBottom: '1rem' }}
         >
-          {isRejected ? 'Application Status: Rejected' : 'Listing Status: Pending Admin Verification'}
+          {isRemoved
+            ? 'Application Status: Removed by Admin'
+            : isSuspended
+            ? 'Application Status: Suspended by Admin'
+            : isRejected
+            ? 'Application Status: Rejected'
+            : 'Listing Status: Pending Admin Verification'}
         </span>
 
         <h2 style={{ fontSize: '1.6rem', fontWeight: 800, marginBottom: '0.75rem', color: 'var(--text-main)' }}>
-          {isRejected ? 'Listing Needs Revision' : 'Your Mess Details Have Been Submitted'}
+          {isRemoved
+            ? 'Mess Listing Removed'
+            : isSuspended
+            ? 'Mess Listing Suspended'
+            : isRejected
+            ? 'Listing Needs Revision'
+            : 'Your Mess Details Have Been Submitted'}
         </h2>
 
         <p style={{ fontSize: '0.95rem', color: 'var(--text-muted)', lineHeight: 1.6, marginBottom: '2rem' }}>
-          {isRejected ? (
+          {isRemoved ? (
+            <span>
+              This mess listing was removed from the platform by an administrator.{' '}
+              <strong>Reason: {(currentMess as any).removalReason || 'Violation of partner policies.'}</strong>{' '}
+              Owner reactivation is not permitted.
+            </span>
+          ) : isSuspended ? (
+            <span>
+              This mess has been suspended by an administrator and is hidden from student search and discovery.
+              You can submit a suspension review request from your owner dashboard.
+            </span>
+          ) : isRejected ? (
             <span>
               Your registration application did not meet campus health verification criteria.{' '}
-              <strong>Reason: {currentMess.rejectionReason || 'Incomplete licensing documents.'}</strong>
+              <strong>Reason: {(currentMess as any).rejectionReason || 'Incomplete licensing documents.'}</strong>
             </span>
           ) : (
             'Your mess details have been submitted. An admin will review them before your mess appears to students.'
@@ -156,10 +184,16 @@ export const PendingApprovalPage: React.FC = () => {
               style={{
                 fontSize: '0.78rem',
                 fontWeight: 700,
-                color: isRejected ? 'var(--danger)' : '#d97706',
+                color: isDanger ? 'var(--danger)' : '#d97706',
               }}
             >
-              {isRejected ? 'Hidden from search' : 'Hidden until Admin approves'}
+              {isRemoved
+                ? 'Removed from search'
+                : isSuspended
+                ? 'Suspended (hidden from search)'
+                : isRejected
+                ? 'Hidden from search'
+                : 'Hidden until Admin approves'}
             </span>
           </div>
         </div>

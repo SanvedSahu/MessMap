@@ -4,6 +4,7 @@ import com.messmap.modules.mess.dto.MessFilterRequest;
 import com.messmap.modules.mess.entity.FoodType;
 import com.messmap.modules.mess.entity.Mess;
 import com.messmap.modules.mess.entity.MessStatus;
+import com.messmap.modules.mess.entity.OperatingStatus;
 import jakarta.persistence.criteria.Predicate;
 import org.springframework.data.jpa.domain.Specification;
 
@@ -13,7 +14,7 @@ import java.util.List;
 
 /**
  * Dynamic JPA Specification builder for filtering approved mess listings.
- * Enforces the APPROVED-only visibility constraint at database query time.
+ * Enforces the APPROVED-only and OPEN-only visibility constraints at database query time.
  */
 public class MessSpecification {
 
@@ -34,6 +35,11 @@ public class MessSpecification {
 
             // 1. Mandatory constraint: Only APPROVED messes are discoverable by students and public visitors
             predicates.add(cb.equal(root.get("status"), MessStatus.APPROVED));
+
+            // 1b. Availability constraint: Exclude owner-closed messes by default
+            if (filter == null || filter.getIncludeClosed() == null || !filter.getIncludeClosed()) {
+                predicates.add(cb.equal(root.get("operatingStatus"), OperatingStatus.OPEN));
+            }
 
             if (filter != null) {
                 // 2. Search keyword filter matching mess name or locality (area / address / city)

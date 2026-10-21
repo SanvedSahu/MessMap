@@ -1,4 +1,4 @@
-export type MessStatus = 'Approved' | 'Pending' | 'Rejected' | 'Under Review' | 'Suspended';
+export type MessStatus = 'Approved' | 'Pending' | 'Rejected' | 'Under Review' | 'Suspended' | 'Removed';
 export type FoodType = 'Pure Veg' | 'Veg & Non-Veg' | 'Jain Friendly';
 export type OperatingStatus = 'Open' | 'Closed' | 'Temporary Closure';
 
@@ -29,6 +29,7 @@ export interface Mess {
   features: string[];
   capacity: number;
   rejectionReason?: string;
+  removalReason?: string;
 }
 
 export type UserRole = 'Student' | 'Mess Owner' | 'Admin';

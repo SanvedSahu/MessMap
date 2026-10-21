@@ -91,6 +91,7 @@ export const getStatusBadgeVariant = (status: string): BadgeVariant => {
       return 'warning';
     case 'rejected':
     case 'suspended':
+    case 'removed':
     case 'flagged':
     case 'critical':
       return 'danger';

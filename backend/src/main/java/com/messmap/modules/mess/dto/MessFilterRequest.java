@@ -45,4 +45,9 @@ public class MessFilterRequest {
      * Maximum price filter.
      */
     private BigDecimal maxPrice;
+
+    /**
+     * Whether to include owner-closed messes (defaults to false for student discovery).
+     */
+    private Boolean includeClosed;
 }

@@ -38,20 +38,25 @@ import { useMessData } from '../../../context/MessDataContext';
 import {
   getMessVerificationStatusApi,
   submitMessVerificationApi,
+  getOwnerSuspensionReviewsApi,
+  requestSuspensionReviewApi,
   type MessVerificationStatusData,
+  type OwnerSuspensionReviewResponse,
 } from '../../../api/ownerApi';
 import './DashboardPage.css';
 
 interface OutletContextType {
   isOpenStatus: boolean;
   toggleOpenStatus: () => void;
+  messStatus?: string;
+  removalReason?: string;
 }
 
 export const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { messes } = useMessData();
-  const { isOpenStatus, toggleOpenStatus } = useOutletContext<OutletContextType>();
+  const { isOpenStatus, toggleOpenStatus, messStatus: layoutMessStatus, removalReason: layoutRemovalReason } = useOutletContext<OutletContextType>();
 
   const isDemoOwner = user.email === 'rajesh.sharma@annapurnamess.com' || user.messId === 'MESS-101';
   // Check if owner has a mess (do not fall back to messes[0] for new accounts)
@@ -65,10 +70,18 @@ export const DashboardPage: React.FC = () => {
   const [verificationError, setVerificationError] = useState<string | null>(null);
   const [verificationSuccessMsg, setVerificationSuccessMsg] = useState<string | null>(null);
 
+  // Suspension review states
+  const [suspensionReviews, setSuspensionReviews] = useState<OwnerSuspensionReviewResponse[]>([]);
+  const [isReviewModalOpen, setIsReviewModalOpen] = useState<boolean>(false);
+  const [reviewExplanation, setReviewExplanation] = useState<string>('');
+  const [isSubmittingReview, setIsSubmittingReview] = useState<boolean>(false);
+  const [reviewSubmitError, setReviewSubmitError] = useState<string | null>(null);
+  const [reviewSubmitSuccess, setReviewSubmitSuccess] = useState<string | null>(null);
+
   const hasMess = !!currentMess || !!user.messId || (verificationStatus != null && verificationStatus.messId != null);
   const messStatus = currentMess?.status || verificationStatus?.status || (isDemoOwner ? 'Approved' : 'Pending');
 
-  // Fetch live verification status from backend
+  // Fetch live verification status and suspension reviews from backend
   useEffect(() => {
     const token = localStorage.getItem('messmap_auth_token');
     if (token) {
@@ -81,8 +94,40 @@ export const DashboardPage: React.FC = () => {
         .catch((err) => {
           console.warn('Backend verification status note:', err.message);
         });
+
+      getOwnerSuspensionReviewsApi(token)
+        .then((res) => {
+          if (res?.data) {
+            setSuspensionReviews(res.data);
+          }
+        })
+        .catch((err) => {
+          console.warn('Backend suspension reviews note:', err.message);
+        });
     }
   }, []);
+
+  const handleSubmitSuspensionReview = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const token = localStorage.getItem('messmap_auth_token');
+    if (!token) return;
+    setIsSubmittingReview(true);
+    setReviewSubmitError(null);
+    setReviewSubmitSuccess(null);
+    try {
+      const res = await requestSuspensionReviewApi(token, reviewExplanation.trim() || undefined);
+      if (res?.data) {
+        setSuspensionReviews((prev) => [res.data, ...prev]);
+        setReviewSubmitSuccess('Suspension review request submitted successfully! An administrator will evaluate your mess listing.');
+        setIsReviewModalOpen(false);
+        setReviewExplanation('');
+      }
+    } catch (err: any) {
+      setReviewSubmitError(err.message || 'Failed to submit suspension review request.');
+    } finally {
+      setIsSubmittingReview(false);
+    }
+  };
 
   const handleSubmitVerification = async () => {
     const token = localStorage.getItem('messmap_auth_token');
@@ -145,6 +190,15 @@ export const DashboardPage: React.FC = () => {
 
   // Handle local availability toggle
   const handleToggleAvailability = () => {
+    if (effectiveStatus === 'REMOVED') {
+      alert('Cannot open mess: This mess listing was removed by an administrator and cannot be reactivated.');
+      return;
+    }
+    if (effectiveStatus === 'SUSPENDED') {
+      alert('Cannot open mess: This mess is currently suspended by an administrator. Please submit a suspension review request.');
+      return;
+    }
+
     toggleOpenStatus();
     const newStatus = !isOpenStatus;
     setStats((prev) => ({ ...prev, isAvailable: newStatus }));
@@ -210,9 +264,14 @@ export const DashboardPage: React.FC = () => {
     }));
   };
 
-  const effectiveStatus = verificationStatus
+  const effectiveStatus = layoutMessStatus
+    ? (layoutMessStatus.toUpperCase() as any)
+    : verificationStatus
     ? verificationStatus.status
     : (messStatus.toUpperCase() as any);
+
+  const pendingSuspensionReview = suspensionReviews.find((r) => r.status === 'PENDING');
+  const latestSuspensionReview = suspensionReviews.length > 0 ? suspensionReviews[0] : null;
 
   if (!hasMess) {
     return (
@@ -324,6 +383,46 @@ export const DashboardPage: React.FC = () => {
         >
           <AlertTriangle size={18} color="#dc2626" />
           <span>{verificationError}</span>
+        </div>
+      )}
+
+      {reviewSubmitSuccess && (
+        <div
+          style={{
+            backgroundColor: '#ecfdf5',
+            border: '1.5px solid #a7f3d0',
+            borderRadius: 'var(--radius-lg)',
+            padding: '0.85rem 1.25rem',
+            marginBottom: '1rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            color: '#065f46',
+            fontWeight: 700,
+          }}
+        >
+          <CheckCircle2 size={18} color="#059669" />
+          <span>{reviewSubmitSuccess}</span>
+        </div>
+      )}
+
+      {reviewSubmitError && (
+        <div
+          style={{
+            backgroundColor: '#fef2f2',
+            border: '1.5px solid #fecaca',
+            borderRadius: 'var(--radius-lg)',
+            padding: '0.85rem 1.25rem',
+            marginBottom: '1rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            color: '#991b1b',
+            fontWeight: 700,
+          }}
+        >
+          <AlertTriangle size={18} color="#dc2626" />
+          <span>{reviewSubmitError}</span>
         </div>
       )}
 
@@ -459,6 +558,158 @@ export const DashboardPage: React.FC = () => {
         </div>
       )}
 
+      {/* REMOVED Status Banner */}
+      {effectiveStatus === 'REMOVED' && (
+        <div
+          style={{
+            backgroundColor: '#fef2f2',
+            border: '2px solid #ef4444',
+            borderRadius: 'var(--radius-lg)',
+            padding: '1.5rem',
+            marginBottom: '1.5rem',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '12px',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px' }}>
+            <AlertCircle size={26} color="#dc2626" style={{ flexShrink: 0, marginTop: '2px' }} />
+            <div>
+              <div style={{ fontWeight: 800, color: '#991b1b', fontSize: '1.05rem', marginBottom: '6px' }}>
+                Listing Removed by Administrator
+              </div>
+              <div style={{ color: '#7f1d1d', fontSize: '0.92rem', lineHeight: 1.6, marginBottom: '10px' }}>
+                The mess <strong>"{currentMess?.name || verificationStatus?.messName || 'Your Mess'}"</strong> has been removed from student discovery by an administrator.
+              </div>
+              <div
+                style={{
+                  backgroundColor: '#ffffff',
+                  border: '1px solid #fecaca',
+                  borderRadius: 'var(--radius-md)',
+                  padding: '10px 14px',
+                  color: '#991b1b',
+                  fontSize: '0.9rem',
+                  lineHeight: 1.5,
+                  marginBottom: '10px',
+                }}
+              >
+                <strong>Administrator Removal Reason: </strong>
+                <span>{verificationStatus?.removalReason || layoutRemovalReason || (currentMess as any)?.removalReason || 'Violation of platform policies.'}</span>
+              </div>
+              <div style={{ color: '#b91c1c', fontSize: '0.85rem', fontWeight: 600 }}>
+                ⚠️ Notice: You cannot reactivate or reopen this mess listing. If you believe this removal was done in error, please contact campus administration at admin@messmap.com.
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* SUSPENDED Status Banner */}
+      {effectiveStatus === 'SUSPENDED' && (
+        <div
+          style={{
+            backgroundColor: '#fffbeb',
+            border: '2px solid #f59e0b',
+            borderRadius: 'var(--radius-lg)',
+            padding: '1.5rem',
+            marginBottom: '1.5rem',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '12px',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px' }}>
+            <AlertTriangle size={26} color="#d97706" style={{ flexShrink: 0, marginTop: '2px' }} />
+            <div style={{ flex: 1 }}>
+              <div style={{ fontWeight: 800, color: '#92400e', fontSize: '1.05rem', marginBottom: '4px' }}>
+                Mess Listing Suspended by Administrator
+              </div>
+              <div style={{ color: '#b45309', fontSize: '0.92rem', lineHeight: 1.6, marginBottom: '8px' }}>
+                The mess <strong>"{currentMess?.name || verificationStatus?.messName || 'Your Mess'}"</strong> is currently suspended. It has been excluded from student discovery and search results. Owners cannot reactivate suspended messes directly.
+              </div>
+
+              {pendingSuspensionReview ? (
+                <div
+                  style={{
+                    backgroundColor: '#fef3c7',
+                    border: '1px solid #fcd34d',
+                    borderRadius: 'var(--radius-md)',
+                    padding: '10px 14px',
+                    color: '#92400e',
+                    fontSize: '0.88rem',
+                    lineHeight: 1.5,
+                    marginBottom: '10px',
+                  }}
+                >
+                  <div style={{ fontWeight: 700, marginBottom: '4px' }}>
+                    ⏳ Suspension Review Request Pending Admin Review
+                  </div>
+                  <div>
+                    <strong>Submitted: </strong>
+                    {new Date(pendingSuspensionReview.createdAt).toLocaleDateString('en-IN', {
+                      month: 'short',
+                      day: 'numeric',
+                      year: 'numeric',
+                    })}
+                  </div>
+                  {pendingSuspensionReview.explanation && (
+                    <div style={{ marginTop: '4px' }}>
+                      <strong>Your Explanation: </strong>
+                      <span>{pendingSuspensionReview.explanation}</span>
+                    </div>
+                  )}
+                  <div style={{ marginTop: '6px', fontSize: '0.82rem', color: '#78350f' }}>
+                    An administrator will evaluate your request shortly. The mess remains unavailable until approved.
+                  </div>
+                </div>
+              ) : latestSuspensionReview && latestSuspensionReview.status === 'REJECTED' ? (
+                <div
+                  style={{
+                    backgroundColor: '#fee2e2',
+                    border: '1px solid #fca5a5',
+                    borderRadius: 'var(--radius-md)',
+                    padding: '10px 14px',
+                    color: '#991b1b',
+                    fontSize: '0.88rem',
+                    lineHeight: 1.5,
+                    marginBottom: '10px',
+                  }}
+                >
+                  <div style={{ fontWeight: 700, marginBottom: '4px' }}>
+                    ❌ Previous Suspension Review Request Rejected
+                  </div>
+                  <div>
+                    <strong>Admin Reason / Remarks: </strong>
+                    <span>{latestSuspensionReview.adminNotes || 'Review request did not meet criteria to lift suspension.'}</span>
+                  </div>
+                  <div style={{ marginTop: '8px' }}>
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      onClick={() => setIsReviewModalOpen(true)}
+                      style={{ fontSize: '0.82rem', padding: '6px 14px' }}
+                    >
+                      Submit Another Review Request
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ marginTop: '8px' }}>
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={() => setIsReviewModalOpen(true)}
+                    id="btn-request-suspension-review"
+                  >
+                    Request Suspension Review
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 1. Welcome Heading & Hero Section */}
       <section className="welcome-hero-card">
         <div className="welcome-text-content">
@@ -476,6 +727,8 @@ export const DashboardPage: React.FC = () => {
                 ? 'Draft Listing'
                 : effectiveStatus === 'REJECTED'
                 ? 'Action Required'
+                : effectiveStatus === 'REMOVED'
+                ? 'Listing Removed'
                 : 'Suspended'}
             </span>
           </div>
@@ -486,19 +739,35 @@ export const DashboardPage: React.FC = () => {
           </p>
 
           <div className="welcome-status-row">
-            <div className={`status-pill ${isOpenStatus ? 'open' : 'closed'}`}>
+            <div className={`status-pill ${isOpenStatus && effectiveStatus === 'APPROVED' ? 'open' : 'closed'}`}>
               <span className="dot" />
               <span>
-                {isOpenStatus ? 'Mess is OPEN for Student Discovery' : 'Mess is currently CLOSED'}
+                {effectiveStatus === 'REMOVED'
+                  ? 'Mess listing has been REMOVED by Administrator'
+                  : effectiveStatus === 'SUSPENDED'
+                  ? 'Mess is SUSPENDED by Administrator'
+                  : isOpenStatus
+                  ? 'Mess is OPEN for Student Discovery'
+                  : 'Mess is currently CLOSED'}
               </span>
             </div>
-            <button
-              type="button"
-              className="btn-toggle-quick"
-              onClick={handleToggleAvailability}
-            >
-              {isOpenStatus ? 'Switch to Closed' : 'Switch to Open'}
-            </button>
+            {effectiveStatus === 'REMOVED' ? (
+              <span style={{ fontSize: '0.85rem', color: '#dc2626', fontWeight: 700, padding: '6px 12px', background: '#fee2e2', borderRadius: 'var(--radius-md)' }}>
+                Reactivation Blocked
+              </span>
+            ) : effectiveStatus === 'SUSPENDED' ? (
+              <span style={{ fontSize: '0.85rem', color: '#d97706', fontWeight: 700, padding: '6px 12px', background: '#fef3c7', borderRadius: 'var(--radius-md)' }}>
+                Reactivation Blocked
+              </span>
+            ) : (
+              <button
+                type="button"
+                className="btn-toggle-quick"
+                onClick={handleToggleAvailability}
+              >
+                {isOpenStatus ? 'Switch to Closed' : 'Switch to Open'}
+              </button>
+            )}
           </div>
         </div>
 
@@ -1030,6 +1299,149 @@ export const DashboardPage: React.FC = () => {
                 </a>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Suspension Review Request Modal */}
+      {isReviewModalOpen && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(15, 23, 42, 0.65)',
+            backdropFilter: 'blur(4px)',
+            zIndex: 9999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '1.25rem',
+          }}
+          onClick={() => setIsReviewModalOpen(false)}
+        >
+          <div
+            style={{
+              backgroundColor: '#ffffff',
+              borderRadius: 'var(--radius-xl)',
+              maxWidth: '540px',
+              width: '100%',
+              boxShadow: 'var(--shadow-xl)',
+              overflow: 'hidden',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                padding: '1.25rem 1.5rem',
+                borderBottom: '1px solid var(--border-color)',
+              }}
+            >
+              <div>
+                <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-main)', margin: 0 }}>
+                  Request Suspension Review
+                </h3>
+                <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', margin: '4px 0 0' }}>
+                  Submit an explanation for campus administrators to review and consider restoring listing.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsReviewModalOpen(false)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: 'var(--text-muted)',
+                  cursor: 'pointer',
+                  padding: '4px',
+                }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmitSuspensionReview}>
+              <div style={{ padding: '1.5rem' }}>
+                {reviewSubmitError && (
+                  <div
+                    style={{
+                      backgroundColor: '#fef2f2',
+                      border: '1px solid #fecaca',
+                      borderRadius: 'var(--radius-md)',
+                      padding: '8px 12px',
+                      color: '#991b1b',
+                      fontSize: '0.85rem',
+                      marginBottom: '12px',
+                    }}
+                  >
+                    {reviewSubmitError}
+                  </div>
+                )}
+
+                <label
+                  htmlFor="reviewExplanation"
+                  style={{
+                    display: 'block',
+                    fontSize: '0.88rem',
+                    fontWeight: 700,
+                    marginBottom: '8px',
+                    color: 'var(--text-main)',
+                  }}
+                >
+                  Explanation & Corrective Actions:
+                </label>
+                <textarea
+                  id="reviewExplanation"
+                  rows={4}
+                  value={reviewExplanation}
+                  onChange={(e) => setReviewExplanation(e.target.value)}
+                  placeholder="Explain improvements made regarding hygiene, timing compliance, or licensing..."
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    borderRadius: 'var(--radius-md)',
+                    border: '1.5px solid var(--border-color)',
+                    fontSize: '0.9rem',
+                    fontFamily: 'inherit',
+                    resize: 'vertical',
+                    boxSizing: 'border-box',
+                  }}
+                />
+                <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', display: 'block', marginTop: '6px' }}>
+                  This request will be routed directly to the administrator's review queue.
+                </span>
+              </div>
+
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'flex-end',
+                  gap: '10px',
+                  padding: '1rem 1.5rem',
+                  borderTop: '1px solid var(--border-color)',
+                  backgroundColor: '#f8fafc',
+                }}
+              >
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => setIsReviewModalOpen(false)}
+                  disabled={isSubmittingReview}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={isSubmittingReview}
+                  id="btn-submit-suspension-review"
+                >
+                  {isSubmittingReview ? 'Submitting...' : 'Submit Review Request'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

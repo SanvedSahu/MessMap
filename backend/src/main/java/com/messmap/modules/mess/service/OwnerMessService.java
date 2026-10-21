@@ -8,8 +8,11 @@ import com.messmap.modules.mess.entity.FoodType;
 import com.messmap.modules.mess.entity.Mess;
 import com.messmap.modules.mess.entity.MessStatus;
 import com.messmap.modules.mess.entity.OperatingStatus;
+import com.messmap.modules.mess.entity.SuspensionReviewRequest;
+import com.messmap.modules.mess.entity.SuspensionReviewStatus;
 import com.messmap.modules.mess.repository.FacilityRepository;
 import com.messmap.modules.mess.repository.MessRepository;
+import com.messmap.modules.mess.repository.SuspensionReviewRequestRepository;
 import com.messmap.modules.user.entity.User;
 import com.messmap.modules.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -34,6 +37,7 @@ public class OwnerMessService {
     private final MessRepository messRepository;
     private final UserRepository userRepository;
     private final FacilityRepository facilityRepository;
+    private final SuspensionReviewRequestRepository suspensionReviewRequestRepository;
 
     /**
      * Create a new mess profile associated with the authenticated mess owner.
@@ -150,6 +154,11 @@ public class OwnerMessService {
         log.info("Updating mess profile: ownerId={}, messId={}, isAdmin={}", ownerId, messId, isAdmin);
         Mess mess = resolveTargetMess(ownerId, messId, isAdmin, "update");
 
+        // Prevent modification of removed mess
+        if (mess.getStatus() == MessStatus.REMOVED) {
+            throw new BadRequestException("This mess listing has been removed by an administrator and cannot be modified or reopened.");
+        }
+
         if (request.getName() != null && !request.getName().isBlank()) {
             mess.setName(request.getName().trim());
         }
@@ -211,6 +220,17 @@ public class OwnerMessService {
             mess.setHeroImage(request.getHeroImage().trim());
         }
         if (request.getOperatingStatus() != null) {
+            if (request.getOperatingStatus() == OperatingStatus.OPEN) {
+                if (mess.getStatus() == MessStatus.SUSPENDED) {
+                    throw new BadRequestException("Cannot open mess: The listing is currently suspended by an administrator.");
+                }
+                if (mess.getStatus() == MessStatus.REMOVED) {
+                    throw new BadRequestException("Cannot open mess: The listing has been removed by an administrator.");
+                }
+                if (mess.getStatus() != MessStatus.APPROVED) {
+                    throw new BadRequestException("Cannot open mess: The listing must be approved by an administrator before opening.");
+                }
+            }
             mess.setOperatingStatus(request.getOperatingStatus());
         }
 
@@ -232,6 +252,10 @@ public class OwnerMessService {
     public MessOwnerResponse updateMessTimings(Long ownerId, Long messId, boolean isAdmin, UpdateMessTimingsRequest request) {
         log.info("Updating mess timings: ownerId={}, messId={}, isAdmin={}", ownerId, messId, isAdmin);
         Mess mess = resolveTargetMess(ownerId, messId, isAdmin, "update timings for");
+
+        if (mess.getStatus() == MessStatus.REMOVED) {
+            throw new BadRequestException("This mess listing has been removed by an administrator and cannot be modified.");
+        }
 
         String breakfast = request.getEffectiveBreakfast();
         String lunch = request.getEffectiveLunch();
@@ -276,6 +300,10 @@ public class OwnerMessService {
         log.info("Updating mess amenities: ownerId={}, messId={}, isAdmin={}", ownerId, messId, isAdmin);
         Mess mess = resolveTargetMess(ownerId, messId, isAdmin, "update amenities for");
 
+        if (mess.getStatus() == MessStatus.REMOVED) {
+            throw new BadRequestException("This mess listing has been removed by an administrator and cannot be modified.");
+        }
+
         Set<Facility> facilities = resolveFacilities(request.getFacilityIds(), request.getAmenities());
         mess.setFacilities(facilities);
 
@@ -295,6 +323,9 @@ public class OwnerMessService {
         log.info("Submitting mess for verification: ownerId={}, messId={}, isAdmin={}", ownerId, messId, isAdmin);
         Mess mess = resolveTargetMess(ownerId, messId, isAdmin, "submit for verification");
 
+        if (mess.getStatus() == MessStatus.REMOVED) {
+            throw new BadRequestException("This mess listing has been removed by an administrator and cannot be resubmitted.");
+        }
         if (mess.getStatus() == MessStatus.PENDING) {
             throw new BadRequestException("Mess listing is already submitted and pending admin verification.");
         }
@@ -302,7 +333,7 @@ public class OwnerMessService {
             throw new BadRequestException("Mess listing is already approved. Resubmission is not permitted.");
         }
         if (mess.getStatus() == MessStatus.SUSPENDED) {
-            throw new BadRequestException("Mess listing is currently suspended. Please contact administrative support.");
+            throw new BadRequestException("This mess is currently suspended by an administrator. Please submit a suspension review request instead.");
         }
         if (mess.getStatus() != MessStatus.DRAFT && mess.getStatus() != MessStatus.REJECTED) {
             throw new BadRequestException("Only listings in DRAFT or REJECTED status can be submitted for verification. Current status: " + mess.getStatus());
@@ -429,5 +460,48 @@ public class OwnerMessService {
         }
 
         return facilities;
+    }
+
+    /**
+     * Submits an owner request for administrative review of a suspended mess listing.
+     * Enforces ownership, active SUSPENDED status, and prevents duplicate pending requests.
+     */
+    @Transactional
+    public SuspensionReviewResponse requestSuspensionReview(Long ownerId, RequestSuspensionReviewRequest request, boolean isAdmin) {
+        Long targetMessId = (request != null) ? request.getMessId() : null;
+        Mess mess = resolveTargetMess(ownerId, targetMessId, isAdmin, "request suspension review for");
+
+        if (mess.getStatus() == MessStatus.REMOVED) {
+            throw new BadRequestException("Cannot request suspension review: This mess listing has been permanently removed.");
+        }
+        if (mess.getStatus() != MessStatus.SUSPENDED) {
+            throw new BadRequestException("Suspension review can only be requested for suspended mess listings. Current status: " + mess.getStatus());
+        }
+
+        boolean hasPending = suspensionReviewRequestRepository.existsByMessIdAndStatus(mess.getId(), SuspensionReviewStatus.PENDING);
+        if (hasPending) {
+            throw new BadRequestException("A suspension review request is already pending administrator review.");
+        }
+
+        SuspensionReviewRequest reviewRequest = SuspensionReviewRequest.builder()
+                .mess(mess)
+                .owner(mess.getOwner())
+                .explanation(request != null && request.getExplanation() != null ? request.getExplanation().trim() : null)
+                .status(SuspensionReviewStatus.PENDING)
+                .build();
+
+        SuspensionReviewRequest saved = suspensionReviewRequestRepository.save(reviewRequest);
+        log.info("Owner id={} submitted suspension review request id={} for mess id={}", ownerId, saved.getId(), mess.getId());
+        return SuspensionReviewResponse.fromEntity(saved);
+    }
+
+    /**
+     * Retrieves suspension review requests submitted for the authenticated owner's mess.
+     */
+    @Transactional(readOnly = true)
+    public List<SuspensionReviewResponse> getOwnerSuspensionReviews(Long ownerId, Long messId, boolean isAdmin) {
+        Mess mess = resolveTargetMess(ownerId, messId, isAdmin, "view suspension reviews for");
+        List<SuspensionReviewRequest> requests = suspensionReviewRequestRepository.findByMessIdOrderByCreatedAtDesc(mess.getId());
+        return requests.stream().map(SuspensionReviewResponse::fromEntity).toList();
     }
 }

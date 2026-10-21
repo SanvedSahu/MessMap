@@ -19,6 +19,7 @@ interface HeaderProps {
   onToggleMobile: () => void;
   isOpenStatus: boolean;
   onToggleOpenStatus: () => void;
+  messStatus?: string;
 }
 
 interface NotificationItem {
@@ -81,6 +82,7 @@ export const Header: React.FC<HeaderProps> = ({
   onToggleMobile,
   isOpenStatus,
   onToggleOpenStatus,
+  messStatus,
 }) => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -136,17 +138,47 @@ export const Header: React.FC<HeaderProps> = ({
       <div className="header-right">
         {/* Operating Status Toggle */}
         <div className="status-toggle-wrapper">
-          <button
-            type="button"
-            className={`status-pill-btn ${isOpenStatus ? 'is-open' : 'is-closed'}`}
-            onClick={onToggleOpenStatus}
-            title={isOpenStatus ? 'Click to mark Closed for today' : 'Click to mark Open for today'}
-          >
-            <Power size={14} className="status-icon" />
-            <span className="status-label">
-              {isOpenStatus ? 'Operating: Open' : 'Operating: Closed'}
-            </span>
-          </button>
+          {messStatus === 'REMOVED' ? (
+            <div
+              className="status-pill-btn is-closed"
+              style={{
+                cursor: 'not-allowed',
+                backgroundColor: '#fee2e2',
+                borderColor: '#fca5a5',
+                color: '#991b1b',
+              }}
+              title="This mess has been removed by an administrator and cannot be reactivated."
+            >
+              <Power size={14} className="status-icon" color="#dc2626" />
+              <span className="status-label">Status: Removed by Admin</span>
+            </div>
+          ) : messStatus === 'SUSPENDED' ? (
+            <div
+              className="status-pill-btn is-closed"
+              style={{
+                cursor: 'not-allowed',
+                backgroundColor: '#fef3c7',
+                borderColor: '#fcd34d',
+                color: '#92400e',
+              }}
+              title="This mess is suspended by an administrator. Please submit a suspension review request."
+            >
+              <Power size={14} className="status-icon" color="#d97706" />
+              <span className="status-label">Status: Suspended by Admin</span>
+            </div>
+          ) : (
+            <button
+              type="button"
+              className={`status-pill-btn ${isOpenStatus ? 'is-open' : 'is-closed'}`}
+              onClick={onToggleOpenStatus}
+              title={isOpenStatus ? 'Click to mark Closed for today' : 'Click to mark Open for today'}
+            >
+              <Power size={14} className="status-icon" />
+              <span className="status-label">
+                {isOpenStatus ? 'Operating: Open' : 'Operating: Closed'}
+              </span>
+            </button>
+          )}
         </div>
 
         {/* Notifications Dropdown */}

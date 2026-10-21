@@ -156,6 +156,10 @@ public class Mess extends BaseEntity {
     @Column(name = "rejection_reason", length = 255)
     private String rejectionReason;
 
+    @Size(max = 500, message = "Removal reason must not exceed 500 characters")
+    @Column(name = "removal_reason", length = 500)
+    private String removalReason;
+
     @Size(max = 500, message = "Hero image URL must not exceed 500 characters")
     @Column(name = "hero_image", length = 500)
     private String heroImage;

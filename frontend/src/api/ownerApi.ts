@@ -18,6 +18,8 @@ export interface OwnerMessSummary {
   openingTime?: string;
   closingTime?: string;
   heroImage?: string;
+  rejectionReason?: string;
+  removalReason?: string;
 }
 
 export interface OwnerProfileApiResponse {
@@ -228,6 +230,8 @@ export interface OwnerMessProfileResponse {
   amenities?: string[];
   heroImage?: string;
   capacity?: number;
+  rejectionReason?: string;
+  removalReason?: string;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -542,8 +546,9 @@ export async function updateMessPricingApi(
 export interface MessVerificationStatusData {
   messId: number;
   messName: string;
-  status: 'DRAFT' | 'PENDING' | 'APPROVED' | 'REJECTED' | 'UNDER_REVIEW' | 'SUSPENDED';
+  status: 'DRAFT' | 'PENDING' | 'APPROVED' | 'REJECTED' | 'UNDER_REVIEW' | 'SUSPENDED' | 'REMOVED';
   rejectionReason?: string;
+  removalReason?: string;
   adminRemarks?: string;
   canSubmit: boolean;
   missingFields: string[];
@@ -598,6 +603,73 @@ export async function getMessVerificationStatusApi(
   const data = await response.json();
   if (!response.ok) {
     throw new Error(data.message || 'Failed to fetch verification status.');
+  }
+  return data;
+}
+
+export interface OwnerSuspensionReviewResponse {
+  id: number;
+  messId: number;
+  messName: string;
+  ownerId: number;
+  ownerName: string;
+  explanation?: string;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  adminNotes?: string;
+  reviewedByAdminName?: string;
+  reviewedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * Submit owner request for administrative review of a suspended mess listing.
+ */
+export async function requestSuspensionReviewApi(
+  token: string,
+  explanation?: string,
+  messId?: number
+): Promise<StandardApiResponse<OwnerSuspensionReviewResponse>> {
+  const url = messId
+    ? `${API_BASE_URL}/owner/mess/${messId}/suspension-review`
+    : `${API_BASE_URL}/owner/mess/suspension-review`;
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ messId, explanation }),
+  });
+
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.message || 'Failed to submit suspension review request.');
+  }
+  return data;
+}
+
+/**
+ * Retrieve suspension review requests for authenticated owner's mess listing.
+ */
+export async function getOwnerSuspensionReviewsApi(
+  token: string,
+  messId?: number
+): Promise<StandardApiResponse<OwnerSuspensionReviewResponse[]>> {
+  const url = messId
+    ? `${API_BASE_URL}/owner/mess/${messId}/suspension-reviews`
+    : `${API_BASE_URL}/owner/mess/suspension-reviews`;
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.message || 'Failed to fetch suspension review requests.');
   }
   return data;
 }

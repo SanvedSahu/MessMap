@@ -11,11 +11,12 @@ import {
   ChevronRight,
   MapPin,
   ShieldCheck,
+  RotateCcw,
   LogOut,
 } from 'lucide-react';
 import { useAuth } from '../../../context/AuthContext';
 
-export type AdminTab = 'dashboard' | 'messes' | 'users' | 'reviews' | 'reports' | 'settings';
+export type AdminTab = 'dashboard' | 'messes' | 'suspension-reviews' | 'users' | 'reviews' | 'reports' | 'settings';
 
 interface AdminSidebarProps {
   currentTab: AdminTab;
@@ -24,6 +25,7 @@ interface AdminSidebarProps {
   onToggleCollapse: () => void;
   pendingMessesCount: number;
   openComplaintsCount: number;
+  pendingSuspensionReviewsCount?: number;
   mobileOpen: boolean;
   onCloseMobile: () => void;
 }
@@ -35,6 +37,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
   onToggleCollapse,
   pendingMessesCount,
   openComplaintsCount,
+  pendingSuspensionReviewsCount = 0,
   mobileOpen,
   onCloseMobile,
 }) => {
@@ -53,6 +56,13 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
       icon: <Utensils size={20} />,
       badge: pendingMessesCount > 0 ? pendingMessesCount : undefined,
       badgeColor: 'warning',
+    },
+    {
+      id: 'suspension-reviews' as AdminTab,
+      label: 'Suspension Reviews',
+      icon: <RotateCcw size={20} />,
+      badge: pendingSuspensionReviewsCount > 0 ? pendingSuspensionReviewsCount : undefined,
+      badgeColor: 'danger',
     },
     {
       id: 'users' as AdminTab,

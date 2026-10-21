@@ -50,11 +50,12 @@ export interface AdminMess {
   foodType: 'PURE_VEG' | 'VEG_NON_VEG' | 'JAIN';
   dailyPrice?: number;
   monthlyPrice?: number;
-  status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'SUSPENDED';
+  status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'SUSPENDED' | 'REMOVED';
   operatingStatus?: 'OPEN' | 'CLOSED';
   openingTime?: string;
   closingTime?: string;
   rejectionReason?: string;
+  removalReason?: string;
   heroImage?: string;
   capacity?: number;
   ownerId?: number;
@@ -188,6 +189,73 @@ export async function suspendMessApi(messId: number | string, reason?: string, t
  */
 export async function unsuspendMessApi(messId: number | string, token?: string): Promise<StandardApiResponse<AdminMess>> {
   return adminFetch<AdminMess>(`/admin/messes/${messId}/unsuspend`, { method: 'POST' }, token);
+}
+
+/**
+ * Permanently remove a mess listing from student discovery with mandatory reason.
+ */
+export async function removeMessApi(
+  messId: number | string,
+  reason: string,
+  token?: string
+): Promise<StandardApiResponse<AdminMess>> {
+  return adminFetch<AdminMess>(`/admin/messes/${messId}/remove`, {
+    method: 'POST',
+    body: JSON.stringify({ reason }),
+  }, token);
+}
+
+export interface SuspensionReviewItem {
+  id: number;
+  messId: number;
+  messName: string;
+  ownerId: number;
+  ownerName: string;
+  ownerEmail?: string;
+  explanation?: string;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  adminNotes?: string;
+  reviewedByAdminName?: string;
+  reviewedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * Fetch suspension review requests queue.
+ */
+export async function getSuspensionReviewsApi(
+  status?: string,
+  token?: string
+): Promise<StandardApiResponse<SuspensionReviewItem[]>> {
+  const query = status && status !== 'All' ? `?status=${status}` : '';
+  return adminFetch<SuspensionReviewItem[]>(`/admin/messes/suspension-reviews${query}`, { method: 'GET' }, token);
+}
+
+/**
+ * Approve an owner's suspension review request and lift the suspension.
+ */
+export async function approveSuspensionReviewApi(
+  requestId: number | string,
+  token?: string
+): Promise<StandardApiResponse<SuspensionReviewItem>> {
+  return adminFetch<SuspensionReviewItem>(`/admin/messes/suspension-reviews/${requestId}/approve`, {
+    method: 'POST',
+  }, token);
+}
+
+/**
+ * Reject an owner's suspension review request with mandatory explanation.
+ */
+export async function rejectSuspensionReviewApi(
+  requestId: number | string,
+  reason: string,
+  token?: string
+): Promise<StandardApiResponse<SuspensionReviewItem>> {
+  return adminFetch<SuspensionReviewItem>(`/admin/messes/suspension-reviews/${requestId}/reject`, {
+    method: 'POST',
+    body: JSON.stringify({ reason }),
+  }, token);
 }
 
 /**

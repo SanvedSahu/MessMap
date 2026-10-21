@@ -50,11 +50,12 @@ public class MessController {
             @RequestParam(name = "city", required = false) String city,
             @RequestParam(name = "minPrice", required = false) BigDecimal minPrice,
             @RequestParam(name = "maxPrice", required = false) BigDecimal maxPrice,
+            @RequestParam(name = "includeClosed", required = false) Boolean includeClosed,
             @RequestParam(name = "page", required = false) Integer page,
             @RequestParam(name = "size", required = false) Integer size
     ) {
-        log.info("GET /api/messes: search='{}', foodType='{}', locality='{}', city='{}', minPrice={}, maxPrice={}, page={}, size={}",
-                search, foodType, locality, city, minPrice, maxPrice, page, size);
+        log.info("GET /api/messes: search='{}', foodType='{}', locality='{}', city='{}', minPrice={}, maxPrice={}, includeClosed={}, page={}, size={}",
+                search, foodType, locality, city, minPrice, maxPrice, includeClosed, page, size);
 
         MessFilterRequest filter = MessFilterRequest.builder()
                 .search(search)
@@ -63,6 +64,7 @@ public class MessController {
                 .city(city)
                 .minPrice(minPrice)
                 .maxPrice(maxPrice)
+                .includeClosed(includeClosed)
                 .build();
 
         if (page != null || size != null) {

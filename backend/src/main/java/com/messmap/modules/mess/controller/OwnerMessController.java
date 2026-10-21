@@ -244,4 +244,76 @@ public class OwnerMessController {
         MessVerificationStatusResponse response = ownerMessService.getVerificationStatus(userPrincipal.getId(), id, isAdmin);
         return ResponseEntity.ok(ApiResponse.success("Mess verification status retrieved successfully", response));
     }
+
+    /**
+     * Submits an owner request for administrative review of a suspended mess listing.
+     * Routes: POST /api/owner/mess/suspension-review, POST /api/v1/owner/mess/suspension-review,
+     *         POST /api/owner/messes/suspension-review, POST /api/v1/owner/messes/suspension-review
+     */
+    @PostMapping({"/api/owner/mess/suspension-review", "/api/v1/owner/mess/suspension-review", "/api/owner/messes/suspension-review", "/api/v1/owner/messes/suspension-review"})
+    public ResponseEntity<ApiResponse<SuspensionReviewResponse>> requestSuspensionReview(
+            @AuthenticationPrincipal UserPrincipal userPrincipal,
+            @Valid @RequestBody(required = false) RequestSuspensionReviewRequest request
+    ) {
+        boolean isAdmin = userPrincipal.getRole() == Role.ROLE_ADMIN;
+        log.info("POST /api/owner/mess/suspension-review: owner id={}, isAdmin={}", userPrincipal.getId(), isAdmin);
+        SuspensionReviewResponse response = ownerMessService.requestSuspensionReview(userPrincipal.getId(), request, isAdmin);
+        return new ResponseEntity<>(
+                ApiResponse.success("Suspension review request submitted successfully", response),
+                HttpStatus.CREATED
+        );
+    }
+
+    /**
+     * Submits an owner request for administrative review of a suspended mess listing by ID.
+     * Routes: POST /api/owner/mess/{id}/suspension-review, POST /api/v1/owner/mess/{id}/suspension-review,
+     *         POST /api/owner/messes/{id}/suspension-review, POST /api/v1/owner/messes/{id}/suspension-review
+     */
+    @PostMapping({"/api/owner/mess/{id}/suspension-review", "/api/v1/owner/mess/{id}/suspension-review", "/api/owner/messes/{id}/suspension-review", "/api/v1/owner/messes/{id}/suspension-review"})
+    public ResponseEntity<ApiResponse<SuspensionReviewResponse>> requestSuspensionReviewById(
+            @PathVariable("id") Long id,
+            @AuthenticationPrincipal UserPrincipal userPrincipal,
+            @Valid @RequestBody(required = false) RequestSuspensionReviewRequest request
+    ) {
+        boolean isAdmin = userPrincipal.getRole() == Role.ROLE_ADMIN;
+        RequestSuspensionReviewRequest effectiveRequest = (request != null) ? request : new RequestSuspensionReviewRequest();
+        effectiveRequest.setMessId(id);
+        log.info("POST /api/owner/mess/{}/suspension-review: owner id={}, isAdmin={}", id, userPrincipal.getId(), isAdmin);
+        SuspensionReviewResponse response = ownerMessService.requestSuspensionReview(userPrincipal.getId(), effectiveRequest, isAdmin);
+        return new ResponseEntity<>(
+                ApiResponse.success("Suspension review request submitted successfully", response),
+                HttpStatus.CREATED
+        );
+    }
+
+    /**
+     * Retrieves suspension review requests submitted for the authenticated owner's primary mess.
+     * Routes: GET /api/owner/mess/suspension-reviews, GET /api/v1/owner/mess/suspension-reviews,
+     *         GET /api/owner/mess/suspension-review, GET /api/v1/owner/mess/suspension-review
+     */
+    @GetMapping({"/api/owner/mess/suspension-reviews", "/api/v1/owner/mess/suspension-reviews", "/api/owner/mess/suspension-review", "/api/v1/owner/mess/suspension-review"})
+    public ResponseEntity<ApiResponse<List<SuspensionReviewResponse>>> getSuspensionReviews(
+            @AuthenticationPrincipal UserPrincipal userPrincipal
+    ) {
+        boolean isAdmin = userPrincipal.getRole() == Role.ROLE_ADMIN;
+        log.info("GET /api/owner/mess/suspension-reviews: owner id={}, isAdmin={}", userPrincipal.getId(), isAdmin);
+        List<SuspensionReviewResponse> responses = ownerMessService.getOwnerSuspensionReviews(userPrincipal.getId(), null, isAdmin);
+        return ResponseEntity.ok(ApiResponse.success("Suspension review requests retrieved successfully", responses));
+    }
+
+    /**
+     * Retrieves suspension review requests submitted for a specific mess by ID.
+     * Routes: GET /api/owner/mess/{id}/suspension-reviews, GET /api/v1/owner/mess/{id}/suspension-reviews,
+     *         GET /api/owner/mess/{id}/suspension-review, GET /api/v1/owner/mess/{id}/suspension-review
+     */
+    @GetMapping({"/api/owner/mess/{id}/suspension-reviews", "/api/v1/owner/mess/{id}/suspension-reviews", "/api/owner/mess/{id}/suspension-review", "/api/v1/owner/mess/{id}/suspension-review"})
+    public ResponseEntity<ApiResponse<List<SuspensionReviewResponse>>> getSuspensionReviewsById(
+            @PathVariable("id") Long id,
+            @AuthenticationPrincipal UserPrincipal userPrincipal
+    ) {
+        boolean isAdmin = userPrincipal.getRole() == Role.ROLE_ADMIN;
+        log.info("GET /api/owner/mess/{}/suspension-reviews: owner id={}, isAdmin={}", id, userPrincipal.getId(), isAdmin);
+        List<SuspensionReviewResponse> responses = ownerMessService.getOwnerSuspensionReviews(userPrincipal.getId(), id, isAdmin);
+        return ResponseEntity.ok(ApiResponse.success("Suspension review requests retrieved successfully", responses));
+    }
 }
