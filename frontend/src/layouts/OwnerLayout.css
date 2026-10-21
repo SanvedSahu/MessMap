@@ -1,0 +1,44 @@
+/* Owner Layout Styles */
+.owner-layout-container {
+  min-height: 100vh;
+  width: 100%;
+  display: flex;
+  background-color: var(--bg-secondary);
+}
+
+.owner-main-wrapper {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  margin-left: var(--sidebar-width);
+  transition: margin-left var(--transition-normal);
+  background-color: var(--bg-secondary);
+}
+
+.owner-layout-container.sidebar-collapsed .owner-main-wrapper {
+  margin-left: var(--sidebar-collapsed-width);
+}
+
+.owner-content-area {
+  flex: 1;
+  padding: 28px;
+  overflow-x: hidden;
+}
+
+.owner-content-inner {
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+/* Responsive adjustments */
+@media (max-width: 1024px) {
+  .owner-main-wrapper,
+  .owner-layout-container.sidebar-collapsed .owner-main-wrapper {
+    margin-left: 0;
+  }
+
+  .owner-content-area {
+    padding: 20px 16px;
+  }
+}
