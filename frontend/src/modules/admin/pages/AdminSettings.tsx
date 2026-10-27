@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { AdminProfile } from '../types/admin.types';
 import { ConfirmDialog } from '../../../components/ui/ConfirmDialog';
+import { getNameInitials } from '../../../utils/userInitials';
 import {
   User,
   Shield,
@@ -109,13 +110,29 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
 
             <form onSubmit={handleSaveProfile} style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem', paddingBottom: '1rem', borderBottom: '1px solid var(--border-color)' }}>
-                <img
-                  src={adminProfile.avatar}
-                  alt={adminProfile.name}
-                  style={{ width: '68px', height: '68px', borderRadius: '50%', objectFit: 'cover', border: '3px solid var(--primary)' }}
-                />
+                <div
+                  style={{
+                    width: '68px',
+                    height: '68px',
+                    borderRadius: '50%',
+                    background: 'linear-gradient(135deg, #10b981, #059669)',
+                    color: '#ffffff',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontWeight: 800,
+                    fontSize: '1.45rem',
+                    letterSpacing: '0.5px',
+                    border: '3px solid var(--primary)',
+                    boxShadow: '0 4px 10px rgba(16, 185, 129, 0.25)',
+                    flexShrink: 0,
+                  }}
+                  title={name || adminProfile.name}
+                >
+                  {getNameInitials(name || adminProfile.name, 'A')}
+                </div>
                 <div>
-                  <div style={{ fontSize: '1.05rem', fontWeight: 800 }}>{adminProfile.name}</div>
+                  <div style={{ fontSize: '1.05rem', fontWeight: 800 }}>{name || adminProfile.name}</div>
                   <div style={{ fontSize: '0.8rem', color: 'var(--primary-dark)', fontWeight: 600 }}>
                     {adminProfile.role}
                   </div>

@@ -15,6 +15,7 @@ import {
 import { AdminTab } from './AdminSidebar';
 import { AdminProfile } from '../types/admin.types';
 import { useAuth } from '../../../context/AuthContext';
+import { getNameInitials } from '../../../utils/userInitials';
 
 interface AdminHeaderProps {
   currentTab: AdminTab;
@@ -38,7 +39,7 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
   onSearchChange,
 }) => {
   const navigate = useNavigate();
-  const { logout } = useAuth();
+  const { user, logout } = useAuth();
   const [showNotifications, setShowNotifications] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const notifRef = useRef<HTMLDivElement>(null);
@@ -332,17 +333,26 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
             }}
             aria-label="Admin profile menu"
           >
-            <img
-              src={adminProfile.avatar}
-              alt={adminProfile.name}
+            <div
               style={{
                 width: '32px',
                 height: '32px',
                 borderRadius: '50%',
-                objectFit: 'cover',
+                background: 'linear-gradient(135deg, #10b981, #059669)',
+                color: '#ffffff',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontWeight: 700,
+                fontSize: '0.8rem',
                 border: '1.5px solid var(--primary)',
+                boxShadow: '0 2px 4px rgba(16, 185, 129, 0.2)',
+                flexShrink: 0,
               }}
-            />
+              title={adminProfile.name}
+            >
+              {getNameInitials(adminProfile.name || user?.name, 'A')}
+            </div>
             <div style={{ textAlign: 'left', lineHeight: 1.2 }}>
               <div style={{ fontSize: '0.825rem', fontWeight: 700, color: 'var(--text-main)' }}>
                 {adminProfile.name}

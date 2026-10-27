@@ -13,6 +13,8 @@ import {
   Power
 } from 'lucide-react';
 import { useAuth } from '../../../context/AuthContext';
+import { getNameInitials } from '../../../utils/userInitials';
+import type { OwnerMessProfileResponse } from '../../../api/ownerApi';
 import './Header.css';
 
 interface HeaderProps {
@@ -20,6 +22,9 @@ interface HeaderProps {
   isOpenStatus: boolean;
   onToggleOpenStatus: () => void;
   messStatus?: string;
+  mess?: OwnerMessProfileResponse | null;
+  allMesses?: OwnerMessProfileResponse[];
+  onSelectMess?: (messId: number | string) => void;
 }
 
 interface NotificationItem {
@@ -83,6 +88,9 @@ export const Header: React.FC<HeaderProps> = ({
   isOpenStatus,
   onToggleOpenStatus,
   messStatus,
+  mess,
+  allMesses,
+  onSelectMess,
 }) => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -261,23 +269,14 @@ export const Header: React.FC<HeaderProps> = ({
             }}
             aria-label="Open profile options"
           >
-            <div className="avatar-wrapper">
-              <img
-                src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=120&h=120&q=80"
-                alt="Owner Rajesh Sharma"
-                className="owner-avatar"
-                onError={(e) => {
-                  // Fallback avatar icon if image fails
-                  (e.target as HTMLElement).style.display = 'none';
-                }}
-              />
-              <span className="avatar-fallback">{user.avatar || 'MO'}</span>
+            <div className="avatar-wrapper" title={user.name || 'Mess Owner'}>
+              <span className="owner-avatar-initials">{getNameInitials(user.name, 'MO')}</span>
               <span className="avatar-online-dot" />
             </div>
 
             <div className="owner-info-text">
               <span className="owner-name">{user.name || 'Mess Owner'}</span>
-              <span className="owner-role">{user.messName || 'My Mess'}</span>
+              <span className="owner-role">{mess?.name || user.messName || 'My Mess'}</span>
             </div>
 
             <ChevronDown size={16} className={`chevron-icon ${showProfileMenu ? 'open' : ''}`} />
@@ -292,6 +291,26 @@ export const Header: React.FC<HeaderProps> = ({
                   <CheckCircle2 size={12} /> Partner Portal
                 </span>
               </div>
+
+              {allMesses && allMesses.length > 1 && (
+                <div style={{ padding: '10px 16px', borderBottom: '1px solid var(--border-light)', backgroundColor: 'var(--bg-app)' }}>
+                  <label style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--text-muted)', display: 'block', marginBottom: '6px', textTransform: 'uppercase' }}>
+                    Active Mess Facility:
+                  </label>
+                  <select
+                    className="form-select"
+                    value={mess?.id || user.messId || ''}
+                    onChange={(e) => onSelectMess && onSelectMess(e.target.value)}
+                    style={{ fontSize: '0.82rem', width: '100%', padding: '6px 8px', fontWeight: 700 }}
+                  >
+                    {allMesses.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.name} ({m.city})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               <div className="profile-menu-links">
                 <button
