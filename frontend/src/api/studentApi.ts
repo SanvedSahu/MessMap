@@ -108,6 +108,7 @@ export interface MessSummaryApiResponse {
   pincode?: string;
   latitude?: number;
   longitude?: number;
+  distanceKm?: number;
   foodType: string;
   dailyPrice?: number;
   monthlyPrice?: number;
@@ -373,6 +374,54 @@ export async function getMessesApi(
   return handleResponse<MessSummaryApiResponse[]>(response);
 }
 
+export interface NearbyMessesParams {
+  latitude: number;
+  longitude: number;
+  radiusKm?: number;
+  foodType?: string;
+  search?: string;
+  minPrice?: number;
+  maxPrice?: number;
+  includeClosed?: boolean;
+}
+
+/**
+ * Retrieve approved messes ordered by distance from student coordinates.
+ * GET /api/messes/nearby
+ */
+export async function getNearbyMessesApi(
+  params: NearbyMessesParams
+): Promise<StandardApiResponse<MessSummaryApiResponse[]>> {
+  const query = new URLSearchParams();
+  query.set('latitude', String(params.latitude));
+  query.set('longitude', String(params.longitude));
+  if (params.radiusKm !== undefined && params.radiusKm !== null) {
+    query.set('radiusKm', String(params.radiusKm));
+  }
+  if (params.foodType && params.foodType !== 'all' && params.foodType !== 'ALL') {
+    query.set('foodType', params.foodType);
+  }
+  if (params.search && params.search.trim()) {
+    query.set('search', params.search.trim());
+  }
+  if (params.minPrice !== undefined && params.minPrice !== null) {
+    query.set('minPrice', String(params.minPrice));
+  }
+  if (params.maxPrice !== undefined && params.maxPrice !== null && params.maxPrice < 10000) {
+    query.set('maxPrice', String(params.maxPrice));
+  }
+  if (params.includeClosed !== undefined) {
+    query.set('includeClosed', String(params.includeClosed));
+  }
+
+  const response = await fetch(`${API_BASE_URL}/messes/nearby?${query.toString()}`, {
+    method: 'GET',
+    headers: { 'Content-Type': 'application/json' },
+  });
+
+  return handleResponse<MessSummaryApiResponse[]>(response);
+}
+
 /**
  * Retrieve comprehensive details and active menus for a specific approved mess.
  * GET /api/messes/{id}
@@ -380,7 +429,10 @@ export async function getMessesApi(
 export async function getMessByIdApi(
   id: string | number
 ): Promise<StandardApiResponse<MessDetailApiResponse>> {
-  const response = await fetch(`${API_BASE_URL}/messes/${id}`, {
+  const normalizedId = typeof id === 'string' && id.startsWith('MESS-')
+    ? id.replace(/^MESS-/i, '')
+    : id;
+  const response = await fetch(`${API_BASE_URL}/messes/${normalizedId}`, {
     method: 'GET',
     headers: { 'Content-Type': 'application/json' },
   });
@@ -399,7 +451,10 @@ export async function getMessByIdApi(
 export async function getMessReviewsApi(
   messId: string | number
 ): Promise<StandardApiResponse<MessReviewsApiResponse>> {
-  const response = await fetch(`${API_BASE_URL}/messes/${messId}/reviews`, {
+  const normalizedId = typeof messId === 'string' && messId.startsWith('MESS-')
+    ? messId.replace(/^MESS-/i, '')
+    : messId;
+  const response = await fetch(`${API_BASE_URL}/messes/${normalizedId}/reviews`, {
     method: 'GET',
     headers: { 'Content-Type': 'application/json' },
   });
@@ -531,6 +586,115 @@ export async function removeFavoriteApi(
 }
 
 // =============================================================================
+// PHASE 8: Student In-App Notifications APIs
+// =============================================================================
+
+export interface StudentNotificationItem {
+  id: number;
+  messId?: number;
+  messName?: string;
+  messHeroImage?: string;
+  messArea?: string;
+  title: string;
+  message: string;
+  type: string;
+  read?: boolean;
+  isRead?: boolean;
+  readAt?: string;
+  createdAt: string;
+}
+
+/**
+ * Fetch all notifications for the authenticated student.
+ * GET /api/student/notifications
+ */
+export async function getStudentNotificationsApi(
+  token?: string
+): Promise<StudentNotificationItem[]> {
+  const activeToken = token || localStorage.getItem('messmap_auth_token') || '';
+  const response = await fetch(`${API_BASE_URL}/student/notifications`, {
+    method: 'GET',
+    headers: {
+      'Authorization': activeToken ? `Bearer ${activeToken}` : '',
+      'Content-Type': 'application/json',
+    },
+  });
+
+  const res = await handleResponse<StudentNotificationItem[]>(response);
+  return (res.data || []).map((item) => ({
+    ...item,
+    read: item.isRead ?? item.read ?? false,
+  }));
+}
+
+/**
+ * Get count of unread notifications for notification bell badge.
+ * GET /api/student/notifications/unread-count
+ */
+export async function getUnreadNotificationsCountApi(
+  token?: string
+): Promise<number> {
+  const activeToken = token || localStorage.getItem('messmap_auth_token') || '';
+  const response = await fetch(`${API_BASE_URL}/student/notifications/unread-count`, {
+    method: 'GET',
+    headers: {
+      'Authorization': activeToken ? `Bearer ${activeToken}` : '',
+      'Content-Type': 'application/json',
+    },
+  });
+
+  const res = await handleResponse<{ count: number }>(response);
+  return res.data?.count ?? 0;
+}
+
+/**
+ * Mark a specific notification as read.
+ * PUT /api/student/notifications/{id}/read
+ */
+export async function markNotificationAsReadApi(
+  id: number,
+  token?: string
+): Promise<StudentNotificationItem | null> {
+  const activeToken = token || localStorage.getItem('messmap_auth_token') || '';
+  const response = await fetch(`${API_BASE_URL}/student/notifications/${id}/read`, {
+    method: 'PUT',
+    headers: {
+      'Authorization': activeToken ? `Bearer ${activeToken}` : '',
+      'Content-Type': 'application/json',
+    },
+  });
+
+  const res = await handleResponse<StudentNotificationItem>(response);
+  if (res.data) {
+    return {
+      ...res.data,
+      read: res.data.isRead ?? res.data.read ?? true,
+    };
+  }
+  return null;
+}
+
+/**
+ * Mark all unread notifications as read.
+ * PUT /api/student/notifications/read-all
+ */
+export async function markAllNotificationsAsReadApi(
+  token?: string
+): Promise<number> {
+  const activeToken = token || localStorage.getItem('messmap_auth_token') || '';
+  const response = await fetch(`${API_BASE_URL}/student/notifications/read-all`, {
+    method: 'PUT',
+    headers: {
+      'Authorization': activeToken ? `Bearer ${activeToken}` : '',
+      'Content-Type': 'application/json',
+    },
+  });
+
+  const res = await handleResponse<{ markedCount: number }>(response);
+  return res.data?.markedCount ?? 0;
+}
+
+// =============================================================================
 // Data Adapters for Frontend Compatibility
 // =============================================================================
 
@@ -540,6 +704,7 @@ export function formatFoodType(foodType?: string): string {
   if (upper === 'PURE_VEG' || upper === 'VEG') return 'Pure Veg';
   if (upper === 'VEG_AND_NON_VEG' || upper === 'BOTH') return 'Veg & Non-Veg';
   if (upper === 'NON_VEG') return 'Non-Veg';
+  if (upper === 'JAIN_FRIENDLY' || upper === 'JAIN') return 'Jain Friendly';
   return foodType;
 }
 
@@ -561,9 +726,9 @@ export function adaptMessSummaryToMessItem(dto: MessSummaryApiResponse): MessIte
     area: dto.area,
     city: dto.city,
     landmark: dto.area || dto.city || 'Campus Area',
-    lat: dto.latitude ? Number(dto.latitude) : 18.5204,
-    lng: dto.longitude ? Number(dto.longitude) : 73.8567,
-    distanceKm: 1.2,
+    lat: dto.latitude != null && !isNaN(Number(dto.latitude)) ? Number(dto.latitude) : NaN,
+    lng: dto.longitude != null && !isNaN(Number(dto.longitude)) ? Number(dto.longitude) : NaN,
+    distanceKm: typeof dto.distanceKm === 'number' && !isNaN(dto.distanceKm) ? dto.distanceKm : NaN,
     monthlyPrice: dto.monthlyPrice ? Number(dto.monthlyPrice) : 3000,
     dailyPrice: dto.dailyPrice ? Number(dto.dailyPrice) : 100,
     isOpenNow: dto.operatingStatus ? dto.operatingStatus === 'OPEN' : true,
@@ -637,9 +802,9 @@ export function adaptFavoriteToMessItem(fav: FavoriteApiResponse): MessItem {
     foodType,
     address: fav.address || `${fav.area ? fav.area + ', ' : ''}${fav.city || ''}`.trim() || 'Address not available',
     landmark: fav.area || fav.city || 'Campus Area',
-    lat: fav.latitude ? Number(fav.latitude) : 18.5204,
-    lng: fav.longitude ? Number(fav.longitude) : 73.8567,
-    distanceKm: 1.2,
+    lat: fav.latitude != null && !isNaN(Number(fav.latitude)) ? Number(fav.latitude) : NaN,
+    lng: fav.longitude != null && !isNaN(Number(fav.longitude)) ? Number(fav.longitude) : NaN,
+    distanceKm: NaN,
     monthlyPrice: fav.monthlyPrice ? Number(fav.monthlyPrice) : 3000,
     dailyPrice: fav.dailyPrice ? Number(fav.dailyPrice) : 100,
     isOpenNow: fav.operatingStatus ? fav.operatingStatus === 'OPEN' : true,

@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Menu, MapPin, Heart } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useFavorites } from '../../context/FavoritesContext';
+import { StudentNotificationBell } from './StudentNotificationBell';
 
 export interface NavbarProps {
   onToggleSidebar?: () => void;
@@ -31,13 +32,16 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
         </div>
       </div>
 
-      {/* Right: Meal Window, Favorites, Subscription Pill & Profile */}
+      {/* Right: Meal Window, Notifications, Favorites, Subscription Pill & Profile */}
       <div className="header-right">
         {/* Live meal window tracker */}
         <div className="header-meal-live-badge" title="Live meal serving status">
           <span className="pulse-dot" />
           <span>Lunch Serving (12:15 – 3:00 PM)</span>
         </div>
+
+        {/* Student In-App Notifications Bell */}
+        <StudentNotificationBell />
 
         {/* Favorites quick link */}
         <Link

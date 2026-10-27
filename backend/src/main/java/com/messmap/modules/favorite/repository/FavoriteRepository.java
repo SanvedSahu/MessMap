@@ -27,4 +27,7 @@ public interface FavoriteRepository extends JpaRepository<Favorite, Long> {
     void deleteByUserIdAndMessId(Long userId, Long messId);
 
     long countByMessId(Long messId);
+
+    @EntityGraph(attributePaths = {"user"})
+    List<Favorite> findByMessId(Long messId);
 }

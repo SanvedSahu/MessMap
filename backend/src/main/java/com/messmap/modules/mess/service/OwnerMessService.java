@@ -21,6 +21,7 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -38,6 +39,7 @@ public class OwnerMessService {
     private final UserRepository userRepository;
     private final FacilityRepository facilityRepository;
     private final SuspensionReviewRequestRepository suspensionReviewRequestRepository;
+    private final com.messmap.modules.notification.service.NotificationService notificationService;
 
     /**
      * Create a new mess profile associated with the authenticated mess owner.
@@ -60,6 +62,8 @@ public class OwnerMessService {
         if (phone == null || phone.isBlank()) {
             throw new BadRequestException("Contact phone number is required");
         }
+
+        validateCoordinates(request.getLatitude(), request.getLongitude());
 
         FoodType foodType = request.getEffectiveFoodType();
 
@@ -210,16 +214,17 @@ public class OwnerMessService {
         if (request.getCapacity() != null) {
             mess.setCapacity(request.getCapacity());
         }
-        if (request.getLatitude() != null) {
+        if (request.getLatitude() != null || request.getLongitude() != null) {
+            validateCoordinates(request.getLatitude(), request.getLongitude());
             mess.setLatitude(request.getLatitude());
-        }
-        if (request.getLongitude() != null) {
             mess.setLongitude(request.getLongitude());
         }
         if (request.getHeroImage() != null) {
             mess.setHeroImage(request.getHeroImage().trim());
         }
+        boolean shouldTriggerOpenNotification = false;
         if (request.getOperatingStatus() != null) {
+            OperatingStatus previousStatus = mess.getOperatingStatus();
             if (request.getOperatingStatus() == OperatingStatus.OPEN) {
                 if (mess.getStatus() == MessStatus.SUSPENDED) {
                     throw new BadRequestException("Cannot open mess: The listing is currently suspended by an administrator.");
@@ -229,6 +234,9 @@ public class OwnerMessService {
                 }
                 if (mess.getStatus() != MessStatus.APPROVED) {
                     throw new BadRequestException("Cannot open mess: The listing must be approved by an administrator before opening.");
+                }
+                if (previousStatus != OperatingStatus.OPEN && mess.getStatus() == MessStatus.APPROVED) {
+                    shouldTriggerOpenNotification = true;
                 }
             }
             mess.setOperatingStatus(request.getOperatingStatus());
@@ -241,6 +249,13 @@ public class OwnerMessService {
         }
 
         Mess updatedMess = messRepository.save(mess);
+        if (shouldTriggerOpenNotification) {
+            try {
+                notificationService.createMessOpenedNotifications(updatedMess);
+            } catch (Exception e) {
+                log.error("Failed to generate mess-opened notifications for mess id={}: {}", updatedMess.getId(), e.getMessage(), e);
+            }
+        }
         log.info("Successfully updated profile for mess id={}", updatedMess.getId());
         return MessOwnerResponse.fromEntity(updatedMess);
     }
@@ -503,5 +518,19 @@ public class OwnerMessService {
         Mess mess = resolveTargetMess(ownerId, messId, isAdmin, "view suspension reviews for");
         List<SuspensionReviewRequest> requests = suspensionReviewRequestRepository.findByMessIdOrderByCreatedAtDesc(mess.getId());
         return requests.stream().map(SuspensionReviewResponse::fromEntity).toList();
+    }
+
+    private void validateCoordinates(BigDecimal latitude, BigDecimal longitude) {
+        if (latitude != null || longitude != null) {
+            if (latitude == null || longitude == null) {
+                throw new BadRequestException("Latitude and longitude must both be provided together");
+            }
+            if (latitude.compareTo(BigDecimal.valueOf(-90.0)) < 0 || latitude.compareTo(BigDecimal.valueOf(90.0)) > 0) {
+                throw new BadRequestException("Latitude must be between -90.0 and 90.0");
+            }
+            if (longitude.compareTo(BigDecimal.valueOf(-180.0)) < 0 || longitude.compareTo(BigDecimal.valueOf(180.0)) > 0) {
+                throw new BadRequestException("Longitude must be between -180.0 and 180.0");
+            }
+        }
     }
 }
