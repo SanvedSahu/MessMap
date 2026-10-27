@@ -279,6 +279,44 @@ export async function getOwnerMessApi(token: string): Promise<StandardApiRespons
 }
 
 /**
+ * Retrieve all messes owned by the authenticated owner.
+ */
+export async function getOwnerMessesApi(token: string): Promise<StandardApiResponse<OwnerMessProfileResponse[]>> {
+  const response = await fetch(`${API_BASE_URL}/owner/messes`, {
+    method: 'GET',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.message || 'Failed to fetch owner messes.');
+  }
+  return data;
+}
+
+/**
+ * Retrieve a specific mess profile by ID owned by the authenticated owner.
+ */
+export async function getOwnerMessByIdApi(token: string, messId: number | string): Promise<StandardApiResponse<OwnerMessProfileResponse>> {
+  const response = await fetch(`${API_BASE_URL}/owner/mess/${messId}`, {
+    method: 'GET',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.message || 'Failed to fetch mess profile.');
+  }
+  return data;
+}
+
+/**
  * Update general mess profile attributes.
  */
 export async function updateOwnerMessProfileApi(
@@ -358,7 +396,7 @@ export interface MenuItemData {
   name: string;
   dishName?: string;
   description?: string;
-  mealType: 'BREAKFAST' | 'LUNCH' | 'DINNER' | 'SPECIAL';
+  mealType: 'BREAKFAST' | 'LUNCH' | 'DINNER' | 'SNACKS' | 'SPECIAL';
   price?: number;
   isAvailable?: boolean;
   dayOfWeek?: string;
@@ -368,7 +406,7 @@ export interface MenuItemData {
 export interface CreateMenuItemPayload {
   messId?: number;
   dayOfWeek: string;
-  mealType: 'BREAKFAST' | 'LUNCH' | 'DINNER' | 'SPECIAL';
+  mealType: 'BREAKFAST' | 'LUNCH' | 'DINNER' | 'SNACKS' | 'SPECIAL';
   dishName: string;
   name?: string;
   description?: string;
@@ -379,7 +417,7 @@ export interface CreateMenuItemPayload {
 
 export interface UpdateMenuItemPayload {
   dayOfWeek?: string;
-  mealType?: 'BREAKFAST' | 'LUNCH' | 'DINNER' | 'SPECIAL';
+  mealType?: 'BREAKFAST' | 'LUNCH' | 'DINNER' | 'SNACKS' | 'SPECIAL';
   dishName?: string;
   name?: string;
   description?: string;

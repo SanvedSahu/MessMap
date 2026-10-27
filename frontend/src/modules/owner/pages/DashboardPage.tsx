@@ -40,29 +40,39 @@ import {
   submitMessVerificationApi,
   getOwnerSuspensionReviewsApi,
   requestSuspensionReviewApi,
+  getOwnerMenuApi,
   type MessVerificationStatusData,
   type OwnerSuspensionReviewResponse,
 } from '../../../api/ownerApi';
+import { getMessReviewsApi } from '../../../api/studentApi';
 import './DashboardPage.css';
 
-interface OutletContextType {
-  isOpenStatus: boolean;
-  toggleOpenStatus: () => void;
+interface DashboardOutletContextType {
+  isOpenStatus?: boolean;
+  toggleOpenStatus?: () => void;
   messStatus?: string;
   removalReason?: string;
+  ownerMess?: any;
+  loadingMess?: boolean;
+  refreshOwnerMess?: () => Promise<any>;
 }
 
 export const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { messes } = useMessData();
-  const { isOpenStatus, toggleOpenStatus, messStatus: layoutMessStatus, removalReason: layoutRemovalReason } = useOutletContext<OutletContextType>();
+  const outletCtx = useOutletContext<DashboardOutletContextType | null>();
+  const isOpenStatus = outletCtx?.isOpenStatus ?? true;
+  const toggleOpenStatus = outletCtx?.toggleOpenStatus ?? (() => {});
+  const layoutMessStatus = outletCtx?.messStatus;
+  const layoutRemovalReason = outletCtx?.removalReason;
+  const ownerMess = outletCtx?.ownerMess ?? null;
+  const loadingMess = outletCtx?.loadingMess ?? false;
+  const refreshOwnerMess = outletCtx?.refreshOwnerMess;
 
   const isDemoOwner = user.email === 'rajesh.sharma@annapurnamess.com' || user.messId === 'MESS-101';
-  // Check if owner has a mess (do not fall back to messes[0] for new accounts)
-  const currentMess = user.messId
-    ? messes.find((m) => m.id === user.messId)
-    : (isDemoOwner ? messes[0] : null);
+  // Check if owner has a mess (prioritize authenticated owner's loaded mess, then messId in context, then demo owner fallback)
+  const currentMess = ownerMess || (user.messId ? messes.find((m) => m.id === user.messId) : (isDemoOwner ? messes[0] : null));
 
   // Live verification status states
   const [verificationStatus, setVerificationStatus] = useState<MessVerificationStatusData | null>(null);
@@ -78,8 +88,52 @@ export const DashboardPage: React.FC = () => {
   const [reviewSubmitError, setReviewSubmitError] = useState<string | null>(null);
   const [reviewSubmitSuccess, setReviewSubmitSuccess] = useState<string | null>(null);
 
-  const hasMess = !!currentMess || !!user.messId || (verificationStatus != null && verificationStatus.messId != null);
-  const messStatus = currentMess?.status || verificationStatus?.status || (isDemoOwner ? 'Approved' : 'Pending');
+  const hasMess = !!ownerMess || !!currentMess || (user.messId != null && user.messId !== '') || (verificationStatus != null && verificationStatus.messId != null);
+  const messStatus = ownerMess?.status || currentMess?.status || verificationStatus?.status || (isDemoOwner ? 'Approved' : 'Pending');
+
+  // Derived display details from persisted mess data
+  const displayMessName =
+    ownerMess?.name ||
+    (typeof (currentMess as any)?.name === 'string' ? (currentMess as any).name : undefined) ||
+    user.messName ||
+    (isDemoOwner ? 'Annapurna Deluxe Mess' : 'My Mess');
+
+  const displayAddress =
+    ownerMess?.address
+      ? `${ownerMess.address}${ownerMess.city ? `, ${ownerMess.city}` : ''}`
+      : (typeof (currentMess as any)?.location === 'string'
+          ? (currentMess as any).location
+          : isDemoOwner
+          ? 'Katraj-Kondhwa Road, Pune • Estd. 2018'
+          : 'Address not configured');
+
+  const formatMonthlyPrice = (price?: number | string) => {
+    if (price == null || price === '') {
+      return isDemoOwner ? '₹3,200' : '₹0';
+    }
+    const num = Number(price);
+    return isNaN(num) ? `₹${price}` : `₹${num.toLocaleString('en-IN')}`;
+  };
+
+  const displayMonthlyPrice = formatMonthlyPrice(ownerMess?.monthlyPrice ?? (currentMess as any)?.price);
+
+  const formatFoodType = (ft?: string) => {
+    if (!ft) return isDemoOwner ? 'Pure Veg' : 'Not specified';
+    switch (ft.toUpperCase()) {
+      case 'PURE_VEG':
+        return 'Pure Veg';
+      case 'VEG_AND_NON_VEG':
+      case 'NON_VEG':
+        return 'Veg & Non-Veg';
+      case 'JAIN_FRIENDLY':
+      case 'JAIN':
+        return 'Jain Friendly';
+      default:
+        return ft;
+    }
+  };
+
+  const displayFoodType = formatFoodType(ownerMess?.foodType ?? (currentMess as any)?.foodType);
 
   // Fetch live verification status and suspension reviews from backend
   useEffect(() => {
@@ -106,6 +160,44 @@ export const DashboardPage: React.FC = () => {
         });
     }
   }, []);
+
+  // Fetch live menu stats and review metrics for the authenticated owner's mess
+  useEffect(() => {
+    const token = localStorage.getItem('messmap_auth_token');
+    if (!token) return;
+
+    const activeMessId = ownerMess?.id || (user.messId && !isNaN(Number(user.messId)) ? Number(user.messId) : undefined);
+    if (activeMessId) {
+      getOwnerMenuApi(token, activeMessId)
+        .then((res) => {
+          if (res?.data) {
+            const items = res.data.items || [];
+            setStats((prev) => ({
+              ...prev,
+              totalMenuItems: items.length,
+              activeMenuItems: items.filter((item) => item.isAvailable !== false).length,
+            }));
+          }
+        })
+        .catch((err) => {
+          console.warn('Dashboard menu stats note:', err.message);
+        });
+
+      getMessReviewsApi(activeMessId)
+        .then((res) => {
+          if (res?.data) {
+            setStats((prev) => ({
+              ...prev,
+              averageRating: Number(res.data.averageRating) || 0,
+              totalReviews: res.data.totalReviews || 0,
+            }));
+          }
+        })
+        .catch((err) => {
+          console.warn('Dashboard reviews stats note:', err.message);
+        });
+    }
+  }, [ownerMess?.id, user.messId]);
 
   const handleSubmitSuspensionReview = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -172,14 +264,7 @@ export const DashboardPage: React.FC = () => {
   });
 
   // Modal states
-  const [isAddMenuOpen, setIsAddMenuOpen] = useState(false);
   const [selectedEnquiry, setSelectedEnquiry] = useState<DashboardEnquiry | null>(null);
-
-  // Form states for Add Menu Item Quick Modal
-  const [dishName, setDishName] = useState('');
-  const [mealCategory, setMealCategory] = useState<'Breakfast' | 'Lunch' | 'Snacks' | 'Dinner'>('Lunch');
-  const [dishPrice, setDishPrice] = useState(90);
-  const [dietType, setDietType] = useState<'Veg' | 'Non-Veg'>('Veg');
 
   const todayDate = new Intl.DateTimeFormat('en-IN', {
     weekday: 'long',
@@ -216,36 +301,6 @@ export const DashboardPage: React.FC = () => {
     setActivities((prev) => [newActivity, ...prev]);
   };
 
-  // Handle Quick Add Menu Item submission
-  const handleAddMenuItem = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!dishName.trim()) return;
-
-    // Increment stats
-    setStats((prev) => ({
-      ...prev,
-      totalMenuItems: prev.totalMenuItems + 1,
-      activeMenuItems: prev.activeMenuItems + 1,
-    }));
-
-    // Add to activity stream
-    const newActivity: ActivityItem = {
-      id: `act-${Date.now()}`,
-      type: 'menu',
-      title: `Added "${dishName.trim()}" to ${mealCategory}`,
-      description: `Dish listed under ${mealCategory} at ₹${dishPrice} (${dietType}).`,
-      timestamp: 'Just now',
-      badgeText: 'Menu Updated',
-      badgeType: 'green',
-    };
-    setActivities((prev) => [newActivity, ...prev]);
-
-    // Reset & close
-    setDishName('');
-    setDishPrice(90);
-    setIsAddMenuOpen(false);
-  };
-
   // Handle marking an enquiry as Replied
   const handleMarkEnquiryReplied = (enquiryId: string) => {
     setEnquiries((prev) =>
@@ -264,14 +319,27 @@ export const DashboardPage: React.FC = () => {
     }));
   };
 
-  const effectiveStatus = layoutMessStatus
-    ? (layoutMessStatus.toUpperCase() as any)
-    : verificationStatus
-    ? verificationStatus.status
-    : (messStatus.toUpperCase() as any);
+  const effectiveStatus: 'APPROVED' | 'PENDING' | 'DRAFT' | 'REJECTED' | 'SUSPENDED' | 'REMOVED' =
+    layoutMessStatus
+      ? (layoutMessStatus.toUpperCase() as any)
+      : ownerMess?.status
+      ? (ownerMess.status.toUpperCase() as any)
+      : verificationStatus
+      ? verificationStatus.status
+      : (messStatus.toUpperCase() as any);
 
   const pendingSuspensionReview = suspensionReviews.find((r) => r.status === 'PENDING');
   const latestSuspensionReview = suspensionReviews.length > 0 ? suspensionReviews[0] : null;
+
+  if (loadingMess && !ownerMess && !isDemoOwner) {
+    return (
+      <div className="dashboard-container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '50vh' }}>
+        <div style={{ textAlign: 'center', color: 'var(--text-secondary)' }}>
+          <p style={{ fontSize: '1.05rem', fontWeight: 600 }}>Loading mess dashboard...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!hasMess) {
     return (
@@ -733,9 +801,9 @@ export const DashboardPage: React.FC = () => {
             </span>
           </div>
 
-          <h2 className="welcome-title">Welcome back, {user.name || 'Rajesh Sharma'}! 👋</h2>
+          <h2 className="welcome-title">Welcome back, {user.name || 'Owner'}! 👋</h2>
           <p className="welcome-subtitle">
-            Overview and real-time operations for <strong>{currentMess?.name || 'Annapurna Deluxe Mess'}</strong> today ({todayDate}).
+            Overview and real-time operations for <strong>{displayMessName}</strong> today ({todayDate}).
           </p>
 
           <div className="welcome-status-row">
@@ -776,7 +844,7 @@ export const DashboardPage: React.FC = () => {
           <button
             type="button"
             className="btn btn-primary"
-            onClick={() => setIsAddMenuOpen(true)}
+            onClick={() => navigate('/owner/menu', { state: { openAddModal: true } })}
             id="btn-quick-add-menu"
           >
             <PlusCircle size={16} /> Add Menu Item
@@ -855,13 +923,25 @@ export const DashboardPage: React.FC = () => {
             </div>
           </div>
           <div className="metric-value-row">
-            <span className="metric-number">{stats.averageRating} ★</span>
-            <span className="trend-badge positive">
-              <TrendingUp size={12} /> +0.2 this week
+            <span className="metric-number">
+              {stats.averageRating > 0 ? `${stats.averageRating.toFixed(1)} ★` : '0.0 ★'}
             </span>
+            {stats.totalReviews > 0 ? (
+              <span className="trend-badge positive">
+                <TrendingUp size={12} /> +0.2 this week
+              </span>
+            ) : (
+              <span className="trend-badge" style={{ background: '#f3f4f6', color: '#6b7280' }}>
+                No reviews yet
+              </span>
+            )}
           </div>
           <div className="metric-footer-row">
-            <span className="metric-footnote">Based on {stats.totalReviews} verified student reviews</span>
+            <span className="metric-footnote">
+              {stats.totalReviews > 0
+                ? `Based on ${stats.totalReviews} verified student reviews`
+                : 'No student reviews published yet'}
+            </span>
             <button
               className="metric-link-btn"
               onClick={() => navigate('/owner/reviews')}
@@ -882,15 +962,29 @@ export const DashboardPage: React.FC = () => {
           </div>
           <div className="metric-value-row">
             <span className="metric-number">
-              {isOpenStatus ? 'Open Today' : 'Closed'}
+              {effectiveStatus === 'REMOVED'
+                ? 'Removed'
+                : effectiveStatus === 'SUSPENDED'
+                ? 'Suspended'
+                : isOpenStatus
+                ? 'Open Today'
+                : 'Closed'}
             </span>
-            <span className={`badge ${isOpenStatus ? 'badge-green' : 'badge-danger'}`}>
-              {isOpenStatus ? 'Serving' : 'Off-duty'}
+            <span className={`badge ${isOpenStatus && effectiveStatus === 'APPROVED' ? 'badge-green' : 'badge-danger'}`}>
+              {effectiveStatus === 'REMOVED'
+                ? 'Inactive'
+                : effectiveStatus === 'SUSPENDED'
+                ? 'Blocked'
+                : isOpenStatus
+                ? 'Serving'
+                : 'Off-duty'}
             </span>
           </div>
           <div className="metric-footer-row">
             <span className="metric-footnote">
-              {isOpenStatus ? 'Visible on student map discovery' : 'Hidden from active nearby search'}
+              {isOpenStatus && effectiveStatus === 'APPROVED'
+                ? 'Visible on student map discovery'
+                : 'Hidden from active nearby search'}
             </span>
             <button
               className="metric-link-btn toggle"
@@ -916,27 +1010,35 @@ export const DashboardPage: React.FC = () => {
           </div>
 
           <div className="activity-timeline">
-            {activities.map((act) => (
-              <div key={act.id} className="activity-timeline-item">
-                <div className={`activity-icon-bubble ${act.badgeType}`}>
-                  {act.type === 'menu' && <UtensilsCrossed size={16} />}
-                  {act.type === 'enquiry' && <MessageSquare size={16} />}
-                  {act.type === 'review' && <Star size={16} />}
-                  {act.type === 'status' && <Power size={16} />}
-                  {act.type === 'profile' && <Store size={16} />}
-                </div>
-
-                <div className="activity-body">
-                  <div className="activity-top-line">
-                    <span className="activity-item-title">{act.title}</span>
-                    <span className="activity-item-time">
-                      <Clock size={11} /> {act.timestamp}
-                    </span>
-                  </div>
-                  <p className="activity-item-desc">{act.description}</p>
-                </div>
+            {activities.length === 0 ? (
+              <div style={{ padding: '2rem 1rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                <p style={{ margin: 0, fontSize: '0.9rem' }}>
+                  No recent activities recorded yet. Updates to your menu, operating status, or profile will appear here.
+                </p>
               </div>
-            ))}
+            ) : (
+              activities.map((act) => (
+                <div key={act.id} className="activity-timeline-item">
+                  <div className={`activity-icon-bubble ${act.badgeType}`}>
+                    {act.type === 'menu' && <UtensilsCrossed size={16} />}
+                    {act.type === 'enquiry' && <MessageSquare size={16} />}
+                    {act.type === 'review' && <Star size={16} />}
+                    {act.type === 'status' && <Power size={16} />}
+                    {act.type === 'profile' && <Store size={16} />}
+                  </div>
+
+                  <div className="activity-body">
+                    <div className="activity-top-line">
+                      <span className="activity-item-title">{act.title}</span>
+                      <span className="activity-item-time">
+                        <Clock size={11} /> {act.timestamp}
+                      </span>
+                    </div>
+                    <p className="activity-item-desc">{act.description}</p>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </section>
 
@@ -946,11 +1048,11 @@ export const DashboardPage: React.FC = () => {
           <section className="card mess-overview-card">
             <div className="mess-overview-header">
               <div className="mess-name-group">
-                <h4 className="mess-name-heading">Annapurna Deluxe Mess</h4>
-                <p className="mess-loc-sub">Katraj-Kondhwa Road, Pune • Estd. 2018</p>
+                <h4 className="mess-name-heading">{displayMessName}</h4>
+                <p className="mess-loc-sub">{displayAddress}</p>
               </div>
-              <span className="badge badge-green">
-                <CheckCircle2 size={12} /> Verified
+              <span className={`badge ${effectiveStatus === 'APPROVED' ? 'badge-green' : effectiveStatus === 'PENDING' ? 'badge-warning' : 'badge-danger'}`}>
+                {effectiveStatus === 'APPROVED' ? <CheckCircle2 size={12} /> : <AlertCircle size={12} />} {effectiveStatus === 'APPROVED' ? 'Verified' : effectiveStatus === 'PENDING' ? 'Pending' : effectiveStatus}
               </span>
             </div>
 
@@ -961,11 +1063,11 @@ export const DashboardPage: React.FC = () => {
               </div>
               <div className="mini-stat-box">
                 <span className="stat-label">Monthly Rate</span>
-                <span className="stat-num">₹3,200</span>
+                <span className="stat-num">{displayMonthlyPrice}</span>
               </div>
               <div className="mini-stat-box">
                 <span className="stat-label">Food Type</span>
-                <span className="stat-num">Pure Veg</span>
+                <span className="stat-num">{displayFoodType}</span>
               </div>
             </div>
 
@@ -1038,177 +1140,95 @@ export const DashboardPage: React.FC = () => {
               </tr>
             </thead>
             <tbody>
-              {enquiries.map((enq) => (
-                <tr key={enq.id} className="enquiry-table-row">
-                  {/* Student Name */}
-                  <td className="td-student">
-                    <div className="student-cell-wrap">
-                      <div className="student-avatar-initials">
-                        {enq.studentName.split(' ').map((n) => n[0]).join('')}
-                      </div>
-                      <div className="student-details">
-                        <span className="student-name-strong">{enq.studentName}</span>
-                        <span className="student-phone-sub">{enq.phone}</span>
-                      </div>
-                    </div>
-                  </td>
-
-                  {/* College */}
-                  <td className="td-college">{enq.college}</td>
-
-                  {/* Plan */}
-                  <td className="td-plan">
-                    <span className="plan-badge-pill">{enq.planType}</span>
-                  </td>
-
-                  {/* Date Time */}
-                  <td className="td-datetime">{enq.dateTime}</td>
-
-                  {/* Status */}
-                  <td className="td-status">
-                    {enq.status === 'New' && (
-                      <span className="badge badge-warning">New</span>
-                    )}
-                    {enq.status === 'In Discussion' && (
-                      <span className="badge badge-info">In Discussion</span>
-                    )}
-                    {enq.status === 'Replied' && (
-                      <span className="badge badge-green">
-                        <CheckCircle2 size={12} /> Replied
-                      </span>
-                    )}
-                  </td>
-
-                  {/* Actions */}
-                  <td className="td-actions">
-                    <div className="action-buttons-group">
-                      <button
-                        type="button"
-                        className="table-action-btn view"
-                        title="View Enquiry Message"
-                        onClick={() => setSelectedEnquiry(enq)}
-                      >
-                        <Eye size={14} /> View
-                      </button>
-
-                      <a
-                        href={`https://wa.me/${enq.phone.replace(/[^0-9]/g, '')}?text=Hello%20${encodeURIComponent(
-                          enq.studentName
-                        )},%20this%20is%20Annapurna%20Mess%20regarding%20your%20inquiry:`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="table-action-btn whatsapp"
-                        title="Reply via WhatsApp"
-                        onClick={() => handleMarkEnquiryReplied(enq.id)}
-                      >
-                        <MessageCircle size={14} /> WhatsApp
-                      </a>
-
-                      <a
-                        href={`tel:${enq.phone}`}
-                        className="table-action-btn call"
-                        title="Call Student"
-                      >
-                        <Phone size={14} />
-                      </a>
-                    </div>
+              {enquiries.length === 0 ? (
+                <tr>
+                  <td colSpan={6} style={{ textAlign: 'center', padding: '2.5rem 1rem', color: 'var(--text-secondary)' }}>
+                    No student enquiries received yet. Direct enquiries will appear here when students contact your mess.
                   </td>
                 </tr>
-              ))}
+              ) : (
+                enquiries.map((enq) => (
+                  <tr key={enq.id} className="enquiry-table-row">
+                    {/* Student Name */}
+                    <td className="td-student">
+                      <div className="student-cell-wrap">
+                        <div className="student-avatar-initials">
+                          {enq.studentName.split(' ').map((n) => n[0]).join('')}
+                        </div>
+                        <div className="student-details">
+                          <span className="student-name-strong">{enq.studentName}</span>
+                          <span className="student-phone-sub">{enq.phone}</span>
+                        </div>
+                      </div>
+                    </td>
+
+                    {/* College */}
+                    <td className="td-college">{enq.college}</td>
+
+                    {/* Plan */}
+                    <td className="td-plan">
+                      <span className="plan-badge-pill">{enq.planType}</span>
+                    </td>
+
+                    {/* Date Time */}
+                    <td className="td-datetime">{enq.dateTime}</td>
+
+                    {/* Status */}
+                    <td className="td-status">
+                      {enq.status === 'New' && (
+                        <span className="badge badge-warning">New</span>
+                      )}
+                      {enq.status === 'In Discussion' && (
+                        <span className="badge badge-info">In Discussion</span>
+                      )}
+                      {enq.status === 'Replied' && (
+                        <span className="badge badge-green">
+                          <CheckCircle2 size={12} /> Replied
+                        </span>
+                      )}
+                    </td>
+
+                    {/* Actions */}
+                    <td className="td-actions">
+                      <div className="action-buttons-group">
+                        <button
+                          type="button"
+                          className="table-action-btn view"
+                          title="View Enquiry Message"
+                          onClick={() => setSelectedEnquiry(enq)}
+                        >
+                          <Eye size={14} /> View
+                        </button>
+
+                        <a
+                          href={`https://wa.me/${enq.phone.replace(/[^0-9]/g, '')}?text=Hello%20${encodeURIComponent(
+                            enq.studentName
+                          )},%20this%20is%20${encodeURIComponent(displayMessName)}%20regarding%20your%20inquiry:`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="table-action-btn whatsapp"
+                          title="Reply via WhatsApp"
+                          onClick={() => handleMarkEnquiryReplied(enq.id)}
+                        >
+                          <MessageCircle size={14} /> WhatsApp
+                        </a>
+
+                        <a
+                          href={`tel:${enq.phone}`}
+                          className="table-action-btn call"
+                          title="Call Student"
+                        >
+                          <Phone size={14} />
+                        </a>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
       </section>
-
-      {/* Quick Add Menu Item Modal */}
-      {isAddMenuOpen && (
-        <div className="modal-backdrop" onClick={() => setIsAddMenuOpen(false)}>
-          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <div className="modal-title-wrap">
-                <UtensilsCrossed size={20} className="modal-title-icon" />
-                <h3 className="modal-title">Quick Add Menu Item</h3>
-              </div>
-              <button
-                type="button"
-                className="modal-close-btn"
-                onClick={() => setIsAddMenuOpen(false)}
-                aria-label="Close modal"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <form onSubmit={handleAddMenuItem} className="modal-form">
-              <div className="form-group">
-                <label className="form-label">Dish Name *</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Shahi Paneer, Poha, Veg Biryani"
-                  value={dishName}
-                  onChange={(e) => setDishName(e.target.value)}
-                  className="form-input"
-                  autoFocus
-                />
-              </div>
-
-              <div className="form-row-2">
-                <div className="form-group">
-                  <label className="form-label">Meal Category *</label>
-                  <select
-                    value={mealCategory}
-                    onChange={(e) => setMealCategory(e.target.value as any)}
-                    className="form-input"
-                  >
-                    <option value="Breakfast">Breakfast</option>
-                    <option value="Lunch">Lunch</option>
-                    <option value="Snacks">Snacks</option>
-                    <option value="Dinner">Dinner</option>
-                  </select>
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label">Dietary Type *</label>
-                  <select
-                    value={dietType}
-                    onChange={(e) => setDietType(e.target.value as any)}
-                    className="form-input"
-                  >
-                    <option value="Veg">Pure Veg</option>
-                    <option value="Non-Veg">Non-Veg</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">Price (₹) *</label>
-                <input
-                  type="number"
-                  required
-                  min={10}
-                  value={dishPrice}
-                  onChange={(e) => setDishPrice(Number(e.target.value))}
-                  className="form-input"
-                />
-              </div>
-
-              <div className="modal-actions">
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  onClick={() => setIsAddMenuOpen(false)}
-                >
-                  Cancel
-                </button>
-                <button type="submit" className="btn btn-primary">
-                  <PlusCircle size={15} /> Add to Today's Menu
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
 
       {/* Enquiry Detail Modal */}
       {selectedEnquiry && (
@@ -1289,7 +1309,7 @@ export const DashboardPage: React.FC = () => {
                 <a
                   href={`https://wa.me/${selectedEnquiry.phone.replace(/[^0-9]/g, '')}?text=Hello%20${encodeURIComponent(
                     selectedEnquiry.studentName
-                  )},%20this%20is%20Annapurna%20Mess%20regarding%20your%20inquiry:`}
+                  )},%20this%20is%20${encodeURIComponent(displayMessName)}%20regarding%20your%20inquiry:`}
                   target="_blank"
                   rel="noreferrer"
                   className="btn btn-primary"

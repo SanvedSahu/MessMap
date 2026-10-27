@@ -290,12 +290,12 @@ public class OwnerMenuService {
     }
 
     /**
-     * Validates that owner-supplied meal session is one of BREAKFAST, LUNCH, or DINNER.
+     * Validates that owner-supplied meal session is one of BREAKFAST, LUNCH, DINNER, or SNACKS.
      * Rejects legacy SPECIAL meal type, directing callers to use the isSpecial boolean flag instead.
      */
     private void validateOwnerMealType(MealType mealType) {
         if (mealType == null) {
-            throw new BadRequestException("Meal type is required (BREAKFAST, LUNCH, or DINNER)");
+            throw new BadRequestException("Meal type is required (BREAKFAST, LUNCH, DINNER, or SNACKS)");
         }
         if (mealType == MealType.SPECIAL) {
             throw new BadRequestException("Meal type must be BREAKFAST, LUNCH, or DINNER. Set isSpecial=true to designate a dish as special.");

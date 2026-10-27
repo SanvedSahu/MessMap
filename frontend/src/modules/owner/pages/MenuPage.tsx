@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate, useLocation, useSearchParams, useOutletContext } from 'react-router-dom';
 import {
   UtensilsCrossed,
   Plus,
@@ -13,6 +13,7 @@ import {
   CreditCard,
   Save,
   Store,
+  AlertCircle,
 } from 'lucide-react';
 import { useAuth } from '../../../context/AuthContext';
 import {
@@ -21,8 +22,14 @@ import {
   updateMenuItemApi,
   deleteMenuItemApi,
   updateMessPricingApi,
+  type OwnerMessProfileResponse,
 } from '../../../api/ownerApi';
 import './MenuPage.css';
+
+interface MenuOutletContextType {
+  ownerMess?: OwnerMessProfileResponse | null;
+  loadingMess?: boolean;
+}
 
 interface MenuItem {
   id: string;
@@ -127,12 +134,26 @@ const initialMenuItems: MenuItem[] = [
 
 export const MenuPage: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const outletCtx = useOutletContext<MenuOutletContextType | null>();
+  const liveMess = outletCtx?.ownerMess;
+  const loadingMess = outletCtx?.loadingMess;
+
   const { user } = useAuth();
   const isDemoOwner = user.email === 'rajesh.sharma@annapurnamess.com' || user.messId === 'MESS-101';
   const storageKey = `messmap_owner_menu_items_${user.id}`;
 
-  const [hasMess, setHasMess] = useState<boolean>(() => !!user.messId || isDemoOwner);
-  const [activeTab, setActiveTab] = useState<'all' | 'breakfast' | 'lunch' | 'snacks' | 'dinner'>('lunch');
+  const [hasMess, setHasMess] = useState<boolean>(() => !!(liveMess || user.messId || isDemoOwner));
+  const activeMessId = liveMess?.id && !String(liveMess.id).startsWith('MESS-') ? Number(liveMess.id) : undefined;
+
+  useEffect(() => {
+    if (liveMess || user.messId || isDemoOwner) {
+      setHasMess(true);
+    }
+  }, [liveMess, user.messId, isDemoOwner]);
+
+  const [activeTab, setActiveTab] = useState<'all' | 'breakfast' | 'lunch' | 'snacks' | 'dinner'>('all');
   const [menuItems, setMenuItems] = useState<MenuItem[]>(() => {
     try {
       const saved = localStorage.getItem(storageKey);
@@ -146,6 +167,8 @@ export const MenuPage: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingDish, setEditingDish] = useState<MenuItem | null>(null);
   const [successToast, setSuccessToast] = useState<string | null>(null);
+  const [errorToast, setErrorToast] = useState<string | null>(null);
+  const [modalError, setModalError] = useState<string | null>(null);
 
   // Pricing form states
   const [breakfastPrice, setBreakfastPrice] = useState<number>(40);
@@ -162,6 +185,7 @@ export const MenuPage: React.FC = () => {
   const [dishPrice, setDishPrice] = useState(80);
   const [dishDiet, setDishDiet] = useState<'veg' | 'non-veg'>('veg');
   const [dishIsSpecial, setDishIsSpecial] = useState(false);
+  const [isSavingDish, setIsSavingDish] = useState(false);
 
   const saveToStorage = (items: MenuItem[]) => {
     try {
@@ -176,11 +200,16 @@ export const MenuPage: React.FC = () => {
     setTimeout(() => setSuccessToast(null), 3000);
   };
 
-  // Fetch menu and pricing from backend on mount
+  const showErrorToast = (msg: string) => {
+    setErrorToast(msg);
+    setTimeout(() => setErrorToast(null), 4000);
+  };
+
+  // Fetch menu and pricing from backend on mount or when active mess changes
   useEffect(() => {
     const token = localStorage.getItem('messmap_auth_token');
     if (token) {
-      getOwnerMenuApi(token)
+      getOwnerMenuApi(token, activeMessId)
         .then((res) => {
           if (res?.data) {
             setHasMess(true);
@@ -213,7 +242,7 @@ export const MenuPage: React.FC = () => {
             err.message &&
             (err.message.includes('not found') || err.message.includes('No mess'))
           ) {
-            if (!isDemoOwner) {
+            if (!isDemoOwner && !liveMess) {
               setHasMess(false);
             }
           } else {
@@ -221,7 +250,7 @@ export const MenuPage: React.FC = () => {
           }
         });
     }
-  }, [user.id, isDemoOwner]);
+  }, [user.id, isDemoOwner, activeMessId, liveMess]);
 
   const handleSavePricing = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -230,6 +259,7 @@ export const MenuPage: React.FC = () => {
     if (token) {
       try {
         await updateMessPricingApi(token, {
+          messId: activeMessId,
           breakfastPrice: Number(breakfastPrice),
           lunchPrice: Number(lunchPrice),
           dinnerPrice: Number(dinnerPrice),
@@ -275,20 +305,27 @@ export const MenuPage: React.FC = () => {
   const deleteItem = async (id: string) => {
     const target = menuItems.find((i) => i.id === id);
     if (window.confirm(`Are you sure you want to remove "${target?.name || 'this dish'}" from the menu?`)) {
-      setMenuItems((prev) => {
-        const updated = prev.filter((item) => item.id !== id);
-        saveToStorage(updated);
-        return updated;
-      });
-      showToast('Dish removed from menu.');
-
       const token = localStorage.getItem('messmap_auth_token');
       if (token && !id.startsWith('m_') && !isNaN(Number(id))) {
         try {
           await deleteMenuItemApi(token, Number(id));
-        } catch (err) {
-          console.warn('Backend menu delete warning:', err);
+          setMenuItems((prev) => {
+            const updated = prev.filter((item) => item.id !== id);
+            saveToStorage(updated);
+            return updated;
+          });
+          showToast('Dish removed from menu.');
+        } catch (err: any) {
+          console.error('Backend menu delete error:', err);
+          showErrorToast(err?.message || 'Failed to delete dish from database.');
         }
+      } else {
+        setMenuItems((prev) => {
+          const updated = prev.filter((item) => item.id !== id);
+          saveToStorage(updated);
+          return updated;
+        });
+        showToast('Dish removed from menu.');
       }
     }
   };
@@ -301,8 +338,36 @@ export const MenuPage: React.FC = () => {
     setDishPrice(80);
     setDishDiet('veg');
     setDishIsSpecial(false);
+    setModalError(null);
     setIsModalOpen(true);
   };
+
+  // Automatically open the Add New Dish modal if navigated with openAddModal state or ?action=add / ?action=add-item
+  const hasAutoOpenedRef = useRef(false);
+
+  useEffect(() => {
+    const stateObj = location.state as { openAddModal?: boolean } | null;
+    const actionParam = searchParams.get('action');
+    const hasAddActionParam = actionParam === 'add' || actionParam === 'add-item';
+    const shouldOpenAdd = Boolean(stateObj?.openAddModal || hasAddActionParam);
+    const messAvailable = hasMess || !!liveMess || !!user.messId || isDemoOwner;
+
+    if (shouldOpenAdd && !hasAutoOpenedRef.current && (!loadingMess || messAvailable)) {
+      hasAutoOpenedRef.current = true;
+      handleOpenAdd();
+
+      // Clear the trigger from location state / searchParams using replace: true
+      // This ensures browser back button and page refresh (F5) work cleanly without re-triggering
+      if (stateObj?.openAddModal) {
+        navigate(location.pathname, { replace: true, state: {} });
+      }
+      if (hasAddActionParam) {
+        const nextParams = new URLSearchParams(searchParams);
+        nextParams.delete('action');
+        setSearchParams(nextParams, { replace: true });
+      }
+    }
+  }, [location.state, searchParams, navigate, setSearchParams, loadingMess, hasMess, liveMess, user.messId, isDemoOwner]);
 
   const handleOpenEdit = (item: MenuItem) => {
     setEditingDish(item);
@@ -312,6 +377,7 @@ export const MenuPage: React.FC = () => {
     setDishPrice(item.price);
     setDishDiet(item.dietType);
     setDishIsSpecial(!!item.isSpecial);
+    setModalError(null);
     setIsModalOpen(true);
   };
 
@@ -320,31 +386,16 @@ export const MenuPage: React.FC = () => {
     if (!dishName.trim()) return;
 
     const token = localStorage.getItem('messmap_auth_token');
-    const backendMealType = dishMeal === 'snacks' ? 'SPECIAL' : (dishMeal.toUpperCase() as any);
+    const backendMealType = dishMeal.toUpperCase() as any;
 
-    if (editingDish) {
-      // Update existing
-      setMenuItems((prev) => {
-        const updated = prev.map((item) =>
-          item.id === editingDish.id
-            ? {
-                ...item,
-                name: dishName.trim(),
-                description: dishDesc.trim() || 'Prepared fresh daily with finest ingredients.',
-                mealType: dishMeal,
-                price: Number(dishPrice),
-                dietType: dishDiet,
-                isSpecial: dishIsSpecial,
-              }
-            : item
-        );
-        saveToStorage(updated);
-        return updated;
-      });
+    setIsSavingDish(true);
+    setModalError(null);
 
-      if (token && !editingDish.id.startsWith('m_') && !isNaN(Number(editingDish.id))) {
-        try {
-          await updateMenuItemApi(token, Number(editingDish.id), {
+    try {
+      if (editingDish) {
+        // Update existing
+        if (token && !editingDish.id.startsWith('m_') && !isNaN(Number(editingDish.id))) {
+          const res = await updateMenuItemApi(token, Number(editingDish.id), {
             dishName: dishName.trim(),
             name: dishName.trim(),
             description: dishDesc.trim() || 'Prepared fresh daily with finest ingredients.',
@@ -352,17 +403,51 @@ export const MenuPage: React.FC = () => {
             price: Number(dishPrice),
             isSpecial: dishIsSpecial,
           });
-        } catch (err) {
-          console.warn('Backend update dish warning:', err);
+
+          const updatedServerItem = res?.data;
+          setMenuItems((prev) => {
+            const updated = prev.map((item) =>
+              item.id === editingDish.id
+                ? {
+                    ...item,
+                    name: updatedServerItem?.name || updatedServerItem?.dishName || dishName.trim(),
+                    description: updatedServerItem?.description || dishDesc.trim() || 'Prepared fresh daily with finest ingredients.',
+                    mealType: (updatedServerItem?.mealType ? updatedServerItem.mealType.toLowerCase() : dishMeal) as any,
+                    price: updatedServerItem?.price != null ? Number(updatedServerItem.price) : Number(dishPrice),
+                    dietType: dishDiet,
+                    isSpecial: updatedServerItem?.isSpecial != null ? !!updatedServerItem.isSpecial : dishIsSpecial,
+                  }
+                : item
+            );
+            saveToStorage(updated);
+            return updated;
+          });
+        } else {
+          setMenuItems((prev) => {
+            const updated = prev.map((item) =>
+              item.id === editingDish.id
+                ? {
+                    ...item,
+                    name: dishName.trim(),
+                    description: dishDesc.trim() || 'Prepared fresh daily with finest ingredients.',
+                    mealType: dishMeal,
+                    price: Number(dishPrice),
+                    dietType: dishDiet,
+                    isSpecial: dishIsSpecial,
+                  }
+                : item
+            );
+            saveToStorage(updated);
+            return updated;
+          });
         }
-      }
-      showToast(`Updated "${dishName.trim()}" successfully! 🍲`);
-    } else {
-      // Add new
-      let newId = `m_${Date.now()}`;
-      if (token) {
-        try {
+        showToast(`Updated "${dishName.trim()}" successfully! 🍲`);
+        setIsModalOpen(false);
+      } else {
+        // Add new item
+        if (token) {
           const res = await createMenuItemApi(token, {
+            messId: activeMessId,
             dishName: dishName.trim(),
             name: dishName.trim(),
             description: dishDesc.trim() || 'Prepared fresh daily with finest ingredients.',
@@ -372,36 +457,78 @@ export const MenuPage: React.FC = () => {
             isSpecial: dishIsSpecial,
             dayOfWeek: 'MONDAY',
           });
-          if (res?.data?.id) {
-            newId = String(res.data.id);
+
+          if (!res?.data?.id) {
+            throw new Error(res?.message || 'Failed to save menu item to database.');
           }
-        } catch (err) {
-          console.warn('Backend create dish warning, using local id:', err);
+
+          const savedItem: MenuItem = {
+            id: String(res.data.id),
+            name: res.data.name || res.data.dishName || dishName.trim(),
+            description: res.data.description || dishDesc.trim() || 'Prepared fresh daily with finest ingredients.',
+            mealType: (res.data.mealType ? res.data.mealType.toLowerCase() : dishMeal) as any,
+            price: Number(res.data.price) || Number(dishPrice),
+            dietType: dishDiet,
+            isAvailable: res.data.isAvailable !== false,
+            isSpecial: !!res.data.isSpecial,
+          };
+
+          setMenuItems((prev) => {
+            const updated = [savedItem, ...prev];
+            saveToStorage(updated);
+            return updated;
+          });
+
+          if (activeTab !== 'all' && activeTab !== dishMeal) {
+            setActiveTab(dishMeal);
+          }
+
+          showToast(`Added "${savedItem.name}" to the menu! ✨`);
+          setIsModalOpen(false);
+        } else if (isDemoOwner) {
+          const newItem: MenuItem = {
+            id: `m_${Date.now()}`,
+            name: dishName.trim(),
+            description: dishDesc.trim() || 'Prepared fresh daily with finest ingredients.',
+            mealType: dishMeal,
+            price: Number(dishPrice),
+            dietType: dishDiet,
+            isAvailable: true,
+            isSpecial: dishIsSpecial,
+          };
+          setMenuItems((prev) => {
+            const updated = [newItem, ...prev];
+            saveToStorage(updated);
+            return updated;
+          });
+          if (activeTab !== 'all' && activeTab !== dishMeal) {
+            setActiveTab(dishMeal);
+          }
+          showToast(`Added "${newItem.name}" to demo menu! ✨`);
+          setIsModalOpen(false);
+        } else {
+          throw new Error('You must be logged in to save menu items.');
         }
       }
-
-      const newItem: MenuItem = {
-        id: newId,
-        name: dishName.trim(),
-        description: dishDesc.trim() || 'Prepared fresh daily with finest ingredients.',
-        mealType: dishMeal,
-        price: Number(dishPrice),
-        dietType: dishDiet,
-        isAvailable: true,
-        isSpecial: dishIsSpecial,
-      };
-      setMenuItems((prev) => {
-        const updated = [newItem, ...prev];
-        saveToStorage(updated);
-        return updated;
-      });
-      showToast(`Added "${newItem.name}" to the menu! ✨`);
+    } catch (err: any) {
+      console.error('Failed to save menu item:', err);
+      const errorMsg = err?.message || 'Failed to save menu item. Please try again.';
+      setModalError(errorMsg);
+      showErrorToast(errorMsg);
+    } finally {
+      setIsSavingDish(false);
     }
-
-    setIsModalOpen(false);
   };
 
-  if (!hasMess) {
+  if (loadingMess && !hasMess && !liveMess && !user.messId && !isDemoOwner) {
+    return (
+      <div className="menu-page-container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '300px' }}>
+        <p style={{ color: 'var(--text-muted)' }}>Loading menu and mess profile...</p>
+      </div>
+    );
+  }
+
+  if (!hasMess && !loadingMess && !liveMess && !user.messId && !isDemoOwner) {
     return (
       <div className="menu-page-container">
         <div
@@ -498,6 +625,25 @@ export const MenuPage: React.FC = () => {
         }}>
           <CheckCircle2 size={18} color="#059669" />
           <span>{successToast}</span>
+        </div>
+      )}
+
+      {errorToast && (
+        <div style={{
+          backgroundColor: '#fef2f2',
+          border: '1px solid #fecaca',
+          color: '#991b1b',
+          padding: '0.75rem 1.25rem',
+          borderRadius: 'var(--radius-md)',
+          marginBottom: '1rem',
+          fontWeight: 700,
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          boxShadow: 'var(--shadow-sm)',
+        }}>
+          <AlertCircle size={18} color="#dc2626" />
+          <span>{errorToast}</span>
         </div>
       )}
 
@@ -725,18 +871,42 @@ export const MenuPage: React.FC = () => {
 
       {/* Add / Edit Dish Modal */}
       {isModalOpen && (
-        <div className="modal-backdrop">
-          <div className="modal-card">
+        <div className="modal-backdrop" onClick={() => setIsModalOpen(false)} id="modal-add-dish">
+          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h3 className="modal-title">
                 {editingDish ? `Edit "${editingDish.name}"` : 'Add New Dish to Menu'}
               </h3>
-              <button className="modal-close-btn" onClick={() => setIsModalOpen(false)}>
+              <button
+                type="button"
+                className="modal-close-btn"
+                onClick={() => setIsModalOpen(false)}
+                aria-label="Close modal"
+              >
                 <X size={20} />
               </button>
             </div>
 
             <form onSubmit={handleSaveDish} className="modal-form">
+              {modalError && (
+                <div style={{
+                  backgroundColor: '#fef2f2',
+                  border: '1px solid #fecaca',
+                  color: '#991b1b',
+                  padding: '0.75rem 1rem',
+                  borderRadius: 'var(--radius-md)',
+                  marginBottom: '1rem',
+                  fontSize: '0.88rem',
+                  fontWeight: 600,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}>
+                  <AlertCircle size={18} color="#dc2626" />
+                  <span>{modalError}</span>
+                </div>
+              )}
+
               <div className="form-group">
                 <label className="form-label">Dish Name *</label>
                 <input
@@ -746,6 +916,8 @@ export const MenuPage: React.FC = () => {
                   value={dishName}
                   onChange={(e) => setDishName(e.target.value)}
                   className="form-input"
+                  id="input-dish-name"
+                  autoFocus
                 />
               </div>
 
@@ -820,8 +992,13 @@ export const MenuPage: React.FC = () => {
                 >
                   Cancel
                 </button>
-                <button type="submit" className="btn btn-primary">
-                  {editingDish ? 'Update Dish' : 'Save Dish'}
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  id="btn-save-dish"
+                  disabled={isSavingDish}
+                >
+                  {isSavingDish ? 'Saving...' : (editingDish ? 'Update Dish' : 'Save Dish')}
                 </button>
               </div>
             </form>

@@ -234,6 +234,80 @@ class OwnerMenuControllerTest {
     }
 
     @Test
+    @DisplayName("POST /api/owner/mess/menu/items - Should add a snack dish to owner's menu")
+    void shouldCreateMenuItemSuccessfully_WithSnacksMealType() throws Exception {
+        CreateMenuItemRequest request = CreateMenuItemRequest.builder()
+                .dishName("Samosa & Masala Chai")
+                .description("Crispy aloo samosa with ginger chai")
+                .mealType(MealType.SNACKS)
+                .dayOfWeek("MONDAY")
+                .price(new BigDecimal("30.00"))
+                .isAvailable(true)
+                .isSpecial(false)
+                .build();
+
+        mockMvc.perform(post("/api/owner/mess/menu/items")
+                        .header("Authorization", "Bearer " + tokenOwnerA)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.id").isNumber())
+                .andExpect(jsonPath("$.data.name").value("Samosa & Masala Chai"))
+                .andExpect(jsonPath("$.data.mealType").value("SNACKS"));
+    }
+
+    @Test
+    @DisplayName("POST /api/owner/mess/menu/items - Should reject cross-owner creation with 403 Forbidden")
+    void shouldForbidCrossOwnerItemCreate() throws Exception {
+        CreateMenuItemRequest request = CreateMenuItemRequest.builder()
+                .messId(messOwnerA.getId())
+                .dishName("Unauthorized Item")
+                .mealType(MealType.LUNCH)
+                .dayOfWeek("MONDAY")
+                .price(new BigDecimal("50.00"))
+                .build();
+
+        mockMvc.perform(post("/api/owner/mess/menu/items")
+                        .header("Authorization", "Bearer " + tokenOwnerB)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.success").value(false));
+    }
+
+    @Test
+    @DisplayName("POST /api/owner/mess/menu/items - Persisted item remains retrievable in subsequent GET requests")
+    void shouldPersistAndRetrieveCreatedMenuItemAcrossRequests() throws Exception {
+        CreateMenuItemRequest request = CreateMenuItemRequest.builder()
+                .dishName("Persistence Test Dish 847")
+                .description("Freshly cooked")
+                .mealType(MealType.LUNCH)
+                .dayOfWeek("MONDAY")
+                .price(new BigDecimal("120.00"))
+                .isAvailable(true)
+                .build();
+
+        org.springframework.test.web.servlet.MvcResult createResult = mockMvc.perform(post("/api/owner/mess/menu/items")
+                        .header("Authorization", "Bearer " + tokenOwnerA)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.success").value(true))
+                .andReturn();
+
+        com.fasterxml.jackson.databind.JsonNode root = objectMapper.readTree(createResult.getResponse().getContentAsString());
+        long createdId = root.get("data").get("id").asLong();
+
+        // Simulate subsequent page load / refresh
+        mockMvc.perform(get("/api/owner/mess/menu")
+                        .header("Authorization", "Bearer " + tokenOwnerA))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.items[?(@.id == " + createdId + ")].name").value("Persistence Test Dish 847"));
+    }
+
+    @Test
     @DisplayName("PUT /api/owner/mess/menu/items/{id} - Should update an existing dish")
     void shouldUpdateMenuItemSuccessfully() throws Exception {
         MenuItem item = menuItemRepository.save(MenuItem.builder()
