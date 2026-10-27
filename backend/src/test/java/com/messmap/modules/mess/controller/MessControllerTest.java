@@ -559,4 +559,121 @@ class MessControllerTest {
                 .andExpect(jsonPath("$.success", is(false)))
                 .andExpect(jsonPath("$.status", is(404)));
     }
+
+    @Test
+    @DisplayName("GET /api/messes/{id} for invalid non-numeric ID like MESS-103 should return HTTP 400 Bad Request")
+    void testGetInvalidMessIdTypeReturns400() throws Exception {
+        mockMvc.perform(get("/api/messes/{id}", "MESS-103"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success", is(false)))
+                .andExpect(jsonPath("$.status", is(400)))
+                .andExpect(jsonPath("$.message", containsString("Invalid parameter 'id': 'MESS-103' is not a valid Long")));
+    }
+
+    @Test
+    @DisplayName("GET /api/messes/nearby: should return approved messes ordered by distance within radius")
+    void testNearbyMesses_OrdersByDistanceAndFiltersByRadius() throws Exception {
+        // Origin at FC Road, Shivajinagar (18.5204, 73.8402)
+        // 1. With radius = 2.0 km: only Annapurna (~0.01 km) should be returned, Maratha (~3.7 km) & Mahavir (~120 km) excluded
+        mockMvc.perform(get("/api/messes/nearby")
+                        .param("latitude", "18.5204")
+                        .param("longitude", "73.8402")
+                        .param("radiusKm", "2.0"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success", is(true)))
+                .andExpect(jsonPath("$.data", hasSize(1)))
+                .andExpect(jsonPath("$.data[0].id", is(approvedVegMessPune.getId().intValue())))
+                .andExpect(jsonPath("$.data[0].name", is("Annapurna Pure Veg Mess")))
+                .andExpect(jsonPath("$.data[0].distanceKm", notNullValue()));
+
+        // 2. With radius = 5.0 km: both Annapurna and Maratha returned, ordered by distance ascending
+        mockMvc.perform(get("/api/messes/nearby")
+                        .param("latitude", "18.5204")
+                        .param("longitude", "73.8402")
+                        .param("radiusKm", "5.0"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success", is(true)))
+                .andExpect(jsonPath("$.data", hasSize(2)))
+                .andExpect(jsonPath("$.data[0].id", is(approvedVegMessPune.getId().intValue())))
+                .andExpect(jsonPath("$.data[1].id", is(approvedNonVegMessPune.getId().intValue())));
+    }
+
+    @Test
+    @DisplayName("GET /api/messes/nearby: should exclude pending, rejected, and suspended messes")
+    void testNearbyMesses_ExcludesUnapprovedMesses() throws Exception {
+        // Check that pendingMess, rejectedMess, suspendedMess located in Pune are never included in nearby results
+        mockMvc.perform(get("/api/messes/nearby")
+                        .param("latitude", "18.5204")
+                        .param("longitude", "73.8402")
+                        .param("radiusKm", "50.0"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success", is(true)))
+                .andExpect(jsonPath("$.data[*].id", not(hasItem(pendingMess.getId().intValue()))))
+                .andExpect(jsonPath("$.data[*].id", not(hasItem(rejectedMess.getId().intValue()))))
+                .andExpect(jsonPath("$.data[*].id", not(hasItem(suspendedMess.getId().intValue()))));
+    }
+
+    @Test
+    @DisplayName("GET /api/messes/nearby: should return 400 Bad Request for invalid coordinates")
+    void testNearbyMesses_InvalidCoordinates_Returns400() throws Exception {
+        // Latitude out of range
+        mockMvc.perform(get("/api/messes/nearby")
+                        .param("latitude", "95.0")
+                        .param("longitude", "73.8402"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success", is(false)))
+                .andExpect(jsonPath("$.status", is(400)))
+                .andExpect(jsonPath("$.message", containsString("Valid latitude")));
+
+        // Longitude out of range
+        mockMvc.perform(get("/api/messes/nearby")
+                        .param("latitude", "18.5204")
+                        .param("longitude", "195.0"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success", is(false)))
+                .andExpect(jsonPath("$.status", is(400)))
+                .andExpect(jsonPath("$.message", containsString("Valid longitude")));
+    }
+
+    @Test
+    @DisplayName("GET /api/messes/nearby: should return 400 Bad Request for invalid radius")
+    void testNearbyMesses_InvalidRadius_Returns400() throws Exception {
+        mockMvc.perform(get("/api/messes/nearby")
+                        .param("latitude", "18.5204")
+                        .param("longitude", "73.8402")
+                        .param("radiusKm", "-2.0"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success", is(false)))
+                .andExpect(jsonPath("$.status", is(400)))
+                .andExpect(jsonPath("$.message", containsString("Radius must be greater than 0")));
+    }
+
+    @Test
+    @DisplayName("GET /api/messes/nearby: should combine nearby distance filter with foodType filter")
+    void testNearbyMesses_WithFoodTypeFilter() throws Exception {
+        mockMvc.perform(get("/api/messes/nearby")
+                        .param("latitude", "18.5204")
+                        .param("longitude", "73.8402")
+                        .param("radiusKm", "5.0")
+                        .param("foodType", "VEG"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success", is(true)))
+                .andExpect(jsonPath("$.data", hasSize(1)))
+                .andExpect(jsonPath("$.data[0].id", is(approvedVegMessPune.getId().intValue())));
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/messes/nearby: should resolve correctly via versioned v1 route alias")
+    void testNearbyMesses_V1Route_ResolvesCorrectly() throws Exception {
+        mockMvc.perform(get("/api/v1/messes/nearby")
+                        .param("latitude", "18.5204")
+                        .param("longitude", "73.8402")
+                        .param("radiusKm", "2.0"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success", is(true)))
+                .andExpect(jsonPath("$.data", hasSize(1)))
+                .andExpect(jsonPath("$.data[0].id", is(approvedVegMessPune.getId().intValue())))
+                .andExpect(jsonPath("$.data[0].name", is("Annapurna Pure Veg Mess")))
+                .andExpect(jsonPath("$.data[0].distanceKm", notNullValue()));
+    }
 }

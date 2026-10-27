@@ -72,6 +72,7 @@ export const MessDetailsPage: React.FC = () => {
       })
       .catch((err: any) => {
         if (!isCurrent) return;
+        console.error(`[MessDetailsPage] Failed to fetch details for mess id '${id}':`, err);
         setError(err?.message || 'Failed to load mess listing details from backend.');
       })
       .finally(() => {

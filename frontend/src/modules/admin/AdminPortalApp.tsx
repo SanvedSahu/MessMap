@@ -56,8 +56,11 @@ import {
  */
 function mapAdminMessToUiMess(adminMess: AdminMess): Mess {
   let foodType: 'Pure Veg' | 'Veg & Non-Veg' | 'Jain Friendly' = 'Pure Veg';
-  if (adminMess.foodType === 'VEG_NON_VEG') foodType = 'Veg & Non-Veg';
-  else if (adminMess.foodType === 'JAIN') foodType = 'Jain Friendly';
+  if (adminMess.foodType === 'VEG_AND_NON_VEG' || (adminMess.foodType as string) === 'VEG_NON_VEG') {
+    foodType = 'Veg & Non-Veg';
+  } else if (adminMess.foodType === 'JAIN_FRIENDLY' || (adminMess.foodType as string) === 'JAIN') {
+    foodType = 'Jain Friendly';
+  }
 
   let status: 'Approved' | 'Pending' | 'Rejected' | 'Suspended' | 'Removed' = 'Pending';
   if (adminMess.status === 'APPROVED') status = 'Approved';
@@ -73,6 +76,8 @@ function mapAdminMessToUiMess(adminMess: AdminMess): Mess {
     ownerEmail: adminMess.ownerEmail || adminMess.email || 'owner@messmap.com',
     address: adminMess.address || 'Campus Lane, University Zone',
     area: adminMess.area || adminMess.city || 'Campus Area',
+    latitude: adminMess.latitude,
+    longitude: adminMess.longitude,
     foodType,
     monthlyPrice: adminMess.monthlyPrice ? Number(adminMess.monthlyPrice) : 3200,
     dailyPrice: adminMess.dailyPrice ? Number(adminMess.dailyPrice) : 110,

@@ -20,9 +20,10 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContext;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.context.SecurityContextImpl;
 
 import java.util.List;
 import java.util.Optional;
@@ -37,12 +38,6 @@ class AdminUserServiceTest {
 
     @Mock
     private UserRepository userRepository;
-
-    @Mock
-    private SecurityContext securityContext;
-
-    @Mock
-    private Authentication authentication;
 
     @InjectMocks
     private AdminUserService adminUserService;
@@ -171,10 +166,9 @@ class AdminUserServiceTest {
     @Test
     @DisplayName("Should update user status successfully")
     void shouldUpdateUserStatusSuccessfully() {
-        SecurityContextHolder.setContext(securityContext);
-        when(securityContext.getAuthentication()).thenReturn(authentication);
-        when(authentication.isAuthenticated()).thenReturn(true);
-        when(authentication.getName()).thenReturn("admin@messmap.com");
+        SecurityContextHolder.setContext(new SecurityContextImpl(new UsernamePasswordAuthenticationToken(
+                "admin@messmap.com", "cred", List.of(new SimpleGrantedAuthority("ROLE_ADMIN"))
+        )));
 
         when(userRepository.findById(2L)).thenReturn(Optional.of(studentUser));
         when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
@@ -188,10 +182,9 @@ class AdminUserServiceTest {
     @Test
     @DisplayName("Should throw BadRequestException when admin attempts to deactivate self")
     void shouldThrowBadRequestWhenAdminDeactivatesSelf() {
-        SecurityContextHolder.setContext(securityContext);
-        when(securityContext.getAuthentication()).thenReturn(authentication);
-        when(authentication.isAuthenticated()).thenReturn(true);
-        when(authentication.getName()).thenReturn("admin@messmap.com");
+        SecurityContextHolder.setContext(new SecurityContextImpl(new UsernamePasswordAuthenticationToken(
+                "admin@messmap.com", "cred", List.of(new SimpleGrantedAuthority("ROLE_ADMIN"))
+        )));
 
         when(userRepository.findById(1L)).thenReturn(Optional.of(adminUser));
 
@@ -203,10 +196,9 @@ class AdminUserServiceTest {
     @Test
     @DisplayName("Should throw BadRequestException when attempting to deactivate the only admin")
     void shouldThrowBadRequestWhenDeactivatingOnlyAdmin() {
-        SecurityContextHolder.setContext(securityContext);
-        when(securityContext.getAuthentication()).thenReturn(authentication);
-        when(authentication.isAuthenticated()).thenReturn(true);
-        when(authentication.getName()).thenReturn("other.admin@messmap.com");
+        SecurityContextHolder.setContext(new SecurityContextImpl(new UsernamePasswordAuthenticationToken(
+                "other.admin@messmap.com", "cred", List.of(new SimpleGrantedAuthority("ROLE_ADMIN"))
+        )));
 
         when(userRepository.findById(1L)).thenReturn(Optional.of(adminUser));
         when(userRepository.countByRole(Role.ROLE_ADMIN)).thenReturn(1L);

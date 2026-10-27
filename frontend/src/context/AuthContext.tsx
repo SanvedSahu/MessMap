@@ -68,7 +68,7 @@ interface AuthContextType {
     monthlyPrice?: number;
     dailyPrice?: number;
     description?: string;
-  }) => Promise<{ success: boolean; error?: string }>;
+  }) => Promise<{ success: boolean; error?: string; messId?: string }>;
   updateProfile: (data: Partial<AuthUser>) => void;
   logout: () => void;
   demoLogin: (role: 'student' | 'owner' | 'admin') => void;
@@ -364,7 +364,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     monthlyPrice?: number;
     dailyPrice?: number;
     description?: string;
-  }): Promise<{ success: boolean; error?: string }> => {
+  }): Promise<{ success: boolean; error?: string; messId?: string }> => {
     let token: string | undefined;
     let userId = 'own-' + Date.now();
     let messId: string | undefined = data.messId;
@@ -430,7 +430,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       avatar: data.name.substring(0, 2).toUpperCase(),
     };
     setUser(newOwner);
-    return { success: true };
+    return { success: true, messId };
   };
 
   const updateProfile = (data: Partial<AuthUser>) => {

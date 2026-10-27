@@ -36,8 +36,13 @@ export interface FoodBadgeProps {
 }
 
 export const FoodBadge: React.FC<FoodBadgeProps> = ({ type }) => {
-  const isVeg = type === 'Pure Veg' || type === 'veg';
-  const isNonVeg = type === 'Non-Veg' || type === 'nonveg';
+  const isJain = type === 'Jain Friendly' || type === 'jain' || type === 'JAIN_FRIENDLY';
+  const isVeg = type === 'Pure Veg' || type === 'veg' || type === 'PURE_VEG';
+  const isNonVeg = type === 'Non-Veg' || type === 'nonveg' || type === 'NON_VEG';
+
+  if (isJain) {
+    return <Badge variant="info">🌿 Jain Friendly</Badge>;
+  }
 
   if (isVeg) {
     return <Badge variant="success">🌱 Pure Veg</Badge>;

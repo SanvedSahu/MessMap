@@ -67,6 +67,76 @@ public class MessDiscoveryService {
     }
 
     /**
+     * Calculates great-circle distance between two geographic coordinates using the Haversine formula.
+     *
+     * @param lat1 Latitude of first point in degrees
+     * @param lon1 Longitude of first point in degrees
+     * @param lat2 Latitude of second point in degrees
+     * @param lon2 Longitude of second point in degrees
+     * @return Distance in kilometers
+     */
+    public static double calculateHaversineDistanceKm(double lat1, double lon1, double lat2, double lon2) {
+        final double EARTH_RADIUS_KM = 6371.0;
+        double dLat = Math.toRadians(lat2 - lat1);
+        double dLon = Math.toRadians(lon2 - lon1);
+        double a = Math.sin(dLat / 2.0) * Math.sin(dLat / 2.0)
+                + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
+                * Math.sin(dLon / 2.0) * Math.sin(dLon / 2.0);
+        double c = 2.0 * Math.atan2(Math.sqrt(a), Math.sqrt(1.0 - a));
+        return EARTH_RADIUS_KM * c;
+    }
+
+    /**
+     * Discovers approved messes within a specified radius (in km) from a given geographic coordinate.
+     * Orders results from nearest to farthest and populates distanceKm.
+     * Messes without valid coordinates are safely excluded from distance-based results.
+     */
+    public List<MessSummaryResponse> getNearbyApprovedMesses(
+            Double latitude,
+            Double longitude,
+            Double radiusKm,
+            MessFilterRequest filter
+    ) {
+        if (latitude == null || latitude < -90.0 || latitude > 90.0) {
+            throw new BadRequestException("Valid latitude between -90.0 and 90.0 is required");
+        }
+        if (longitude == null || longitude < -180.0 || longitude > 180.0) {
+            throw new BadRequestException("Valid longitude between -180.0 and 180.0 is required");
+        }
+        double effectiveRadius = (radiusKm != null) ? radiusKm : 5.0;
+        if (effectiveRadius <= 0.0 || effectiveRadius > 100.0) {
+            throw new BadRequestException("Radius must be greater than 0 and at most 100 km");
+        }
+
+        log.info("Executing nearby approved mess discovery: origin=({}, {}), radius={}km, filters={}",
+                latitude, longitude, effectiveRadius, filter);
+
+        List<FoodType> allowedFoodTypes = null;
+        if (filter != null) {
+            allowedFoodTypes = resolveAndValidateFoodType(filter.getFoodType());
+            validatePriceRange(filter.getMinPrice(), filter.getMaxPrice());
+        }
+
+        Specification<Mess> spec = MessSpecification.withFilters(filter, allowedFoodTypes);
+        List<Mess> messes = messRepository.findAll(spec);
+
+        return messes.stream()
+                .filter(m -> m.getLatitude() != null && m.getLongitude() != null)
+                .map(m -> {
+                    double dist = calculateHaversineDistanceKm(
+                            latitude, longitude,
+                            m.getLatitude().doubleValue(), m.getLongitude().doubleValue()
+                    );
+                    MessSummaryResponse summary = mapToSummaryResponse(m);
+                    summary.setDistanceKm(BigDecimal.valueOf(dist).setScale(2, RoundingMode.HALF_UP).doubleValue());
+                    return summary;
+                })
+                .filter(s -> s.getDistanceKm() <= effectiveRadius)
+                .sorted(java.util.Comparator.comparingDouble(MessSummaryResponse::getDistanceKm))
+                .toList();
+    }
+
+    /**
      * Discovers approved messes with pagination support.
      *
      * @param filter   Filter criteria

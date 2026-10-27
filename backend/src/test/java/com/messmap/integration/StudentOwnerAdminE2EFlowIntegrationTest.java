@@ -179,6 +179,8 @@ public class StudentOwnerAdminE2EFlowIntegrationTest {
                 .lunchTiming("12:00 PM - 03:00 PM")
                 .dinnerTiming("07:30 PM - 10:00 PM")
                 .amenities(Collections.singletonList("RO Purified Water"))
+                .latitude(new BigDecimal("18.5204000"))
+                .longitude(new BigDecimal("73.8402000"))
                 .draft(true)
                 .build();
 
@@ -258,6 +260,15 @@ public class StudentOwnerAdminE2EFlowIntegrationTest {
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data", hasSize(0)));
 
+        // 3b-2. Student Nearby Search: Pending mess MUST NOT be in nearby results
+        mockMvc.perform(get("/api/v1/messes/nearby")
+                        .param("latitude", "18.5204")
+                        .param("longitude", "73.8402")
+                        .param("radiusKm", "5.0"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data", hasSize(0)));
+
         // 3c. Direct lookup of unapproved mess returns 404
         mockMvc.perform(get("/api/v1/messes/" + messId)
                         .contentType(MediaType.APPLICATION_JSON))
@@ -322,6 +333,26 @@ public class StudentOwnerAdminE2EFlowIntegrationTest {
                 .andExpect(jsonPath("$.data.menuItems", hasSize(greaterThanOrEqualTo(1))))
                 .andExpect(jsonPath("$.data.menuItems[0].dishName").value("Paneer Butter Masala Thali"));
 
+        // 5c. Student Nearby Search: Approved mess appears with distance
+        mockMvc.perform(get("/api/v1/messes/nearby")
+                        .param("latitude", "18.5204")
+                        .param("longitude", "73.8402")
+                        .param("radiusKm", "5.0"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data", hasSize(1)))
+                .andExpect(jsonPath("$.data[0].id").value(messId))
+                .andExpect(jsonPath("$.data[0].distanceKm").value(closeTo(0.0, 0.1)));
+
+        // 5d. Student Nearby Search with small radius excludes the mess
+        mockMvc.perform(get("/api/messes/nearby")
+                        .param("latitude", "18.5700")
+                        .param("longitude", "73.8402")
+                        .param("radiusKm", "1.0"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data", hasSize(0)));
+
         // =========================================================================
         // STEP 6: Admin Suspension & Unsuspension Lifecycle
         // =========================================================================
@@ -345,6 +376,14 @@ public class StudentOwnerAdminE2EFlowIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data", hasSize(0)));
 
+        // 6b-2. Student Nearby Search: suspended mess immediately disappears from nearby discovery
+        mockMvc.perform(get("/api/v1/messes/nearby")
+                        .param("latitude", "18.5204")
+                        .param("longitude", "73.8402")
+                        .param("radiusKm", "5.0"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data", hasSize(0)));
+
         // 6c. Admin Unsuspends Mess
         mockMvc.perform(post("/api/v1/admin/messes/" + messId + "/unsuspend")
                         .header("Authorization", "Bearer " + adminToken)
@@ -361,5 +400,14 @@ public class StudentOwnerAdminE2EFlowIntegrationTest {
                 .andExpect(jsonPath("$.data", hasSize(1)))
                 .andExpect(jsonPath("$.data[0].id").value(messId))
                 .andExpect(jsonPath("$.data[0].status").value("APPROVED"));
+
+        // 6d-2. Student Nearby Search: unsuspended mess immediately reappears in nearby discovery
+        mockMvc.perform(get("/api/v1/messes/nearby")
+                        .param("latitude", "18.5204")
+                        .param("longitude", "73.8402")
+                        .param("radiusKm", "5.0"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data", hasSize(1)))
+                .andExpect(jsonPath("$.data[0].id").value(messId));
     }
 }

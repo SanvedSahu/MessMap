@@ -457,4 +457,224 @@ class OwnerMessControllerTest {
                 .andExpect(jsonPath("$.success", is(true)))
                 .andExpect(jsonPath("$.data.facilities", hasSize(1)));
     }
+
+    @Test
+    @DisplayName("16. Regression: Owner mess registration persists submitted fields and admin approval preserves them")
+    void shouldPersistCustomRegisteredMessDetailsAndPreserveOnAdminApproval() throws Exception {
+        // Create a distinct third mess owner
+        User ownerC = userRepository.save(User.builder()
+                .name("Distinct Owner")
+                .email("distinct.owner@test.com")
+                .password(passwordEncoder.encode("password123"))
+                .phone("+91 91234 56789")
+                .role(Role.ROLE_MESS_OWNER)
+                .status(UserStatus.ACTIVE)
+                .build());
+        String tokenOwnerC = tokenProvider.generateToken(ownerC);
+
+        // 1. Submit distinct mess registration
+        CreateMessRequest registrationRequest = CreateMessRequest.builder()
+                .name("Regression Test Mess 847")
+                .description("Verified distinct homestyle mess")
+                .address("742 Evergreen Terrace, Kothrud")
+                .locality("Kothrud")
+                .city("Pune")
+                .state("Maharashtra")
+                .pincode("411038")
+                .contact("+91 98765 43210")
+                .foodType("PURE_VEG")
+                .monthlyPrice(BigDecimal.valueOf(4275))
+                .dailyPrice(BigDecimal.valueOf(140))
+                .capacity(50)
+                .build();
+
+        String createResponseJson = mockMvc.perform(post("/api/owner/mess")
+                        .header("Authorization", "Bearer " + tokenOwnerC)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(registrationRequest)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.success", is(true)))
+                .andExpect(jsonPath("$.data.name", is("Regression Test Mess 847")))
+                .andExpect(jsonPath("$.data.monthlyPrice", is(4275)))
+                .andExpect(jsonPath("$.data.foodType", is("PURE_VEG")))
+                .andExpect(jsonPath("$.data.address", is("742 Evergreen Terrace, Kothrud")))
+                .andExpect(jsonPath("$.data.phone", is("+91 98765 43210")))
+                .andExpect(jsonPath("$.data.status", is("PENDING")))
+                .andReturn().getResponse().getContentAsString();
+
+        Long createdMessId = objectMapper.readTree(createResponseJson).path("data").path("id").asLong();
+
+        // 2. Admin approves the mess
+        mockMvc.perform(post("/api/admin/messes/" + createdMessId + "/approve")
+                        .header("Authorization", "Bearer " + tokenAdmin)
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success", is(true)))
+                .andExpect(jsonPath("$.data.id", is(createdMessId.intValue())))
+                .andExpect(jsonPath("$.data.name", is("Regression Test Mess 847")))
+                .andExpect(jsonPath("$.data.status", is("APPROVED")));
+
+        // 3. Authenticated Owner C fetches their mess via GET /api/v1/owner/mess
+        mockMvc.perform(get("/api/v1/owner/mess")
+                        .header("Authorization", "Bearer " + tokenOwnerC)
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success", is(true)))
+                .andExpect(jsonPath("$.data.id", is(createdMessId.intValue())))
+                .andExpect(jsonPath("$.data.name", is("Regression Test Mess 847")))
+                .andExpect(jsonPath("$.data.monthlyPrice", is(4275)))
+                .andExpect(jsonPath("$.data.foodType", is("PURE_VEG")))
+                .andExpect(jsonPath("$.data.address", is("742 Evergreen Terrace, Kothrud")))
+                .andExpect(jsonPath("$.data.phone", is("+91 98765 43210")))
+                .andExpect(jsonPath("$.data.status", is("APPROVED")));
+
+        // 4. Authenticated Owner B fetches their mess and receives their OWN mess, NOT Owner C's or demo mess
+        mockMvc.perform(get("/api/v1/owner/mess")
+                        .header("Authorization", "Bearer " + tokenOwnerB)
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success", is(true)))
+                .andExpect(jsonPath("$.data.id", is(messOwnerB.getId().intValue())))
+                .andExpect(jsonPath("$.data.name", is("Shivneri Mess")))
+                .andExpect(jsonPath("$.data.name", not(is("Regression Test Mess 847"))))
+                .andExpect(jsonPath("$.data.name", not(is("Annapurna Deluxe Mess"))));
+    }
+
+    @Test
+    @DisplayName("17. Regression: Owner without registered mess receives 404 (onboarding trigger) and empty messes list")
+    void shouldReturn404WhenOwnerHasNoRegisteredMessInsteadOfDefault() throws Exception {
+        User ownerNoMess = userRepository.save(User.builder()
+                .name("New Owner Without Mess")
+                .email("no.mess.owner@test.com")
+                .password(passwordEncoder.encode("password123"))
+                .role(Role.ROLE_MESS_OWNER)
+                .status(UserStatus.ACTIVE)
+                .build());
+        String tokenNoMess = tokenProvider.generateToken(ownerNoMess);
+
+        // Primary mess returns 404 Not Found so frontend displays onboarding
+        mockMvc.perform(get("/api/v1/owner/mess")
+                        .header("Authorization", "Bearer " + tokenNoMess)
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.status", is(404)))
+                .andExpect(jsonPath("$.message", containsString("No mess listing found")));
+
+        // All messes returns empty array
+        mockMvc.perform(get("/api/v1/owner/messes")
+                        .header("Authorization", "Bearer " + tokenNoMess)
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success", is(true)))
+                .andExpect(jsonPath("$.data", hasSize(0)));
+    }
+
+    @Test
+    @DisplayName("18. Regression: Owner cannot retrieve another owner's private mess via GET /api/v1/owner/mess/{id}")
+    void shouldPreventOwnerFromRetrievingAnotherOwnersPrivateMess() throws Exception {
+        // Owner B tries to access Owner A's mess profile through owner management endpoint
+        mockMvc.perform(get("/api/v1/owner/mess/" + messOwnerA.getId())
+                        .header("Authorization", "Bearer " + tokenOwnerB)
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.status", is(403)))
+                .andExpect(jsonPath("$.message", containsString("Access is denied")));
+    }
+
+    @Test
+    @DisplayName("19. Feature: Register mess with exact pinned coordinates and retrieve them")
+    void shouldPersistExactPinnedCoordinatesOnRegistration() throws Exception {
+        User ownerLoc = userRepository.save(User.builder()
+                .name("Location Owner")
+                .email("location.owner@test.com")
+                .password(passwordEncoder.encode("password123"))
+                .phone("+91 91111 22222")
+                .role(Role.ROLE_MESS_OWNER)
+                .status(UserStatus.ACTIVE)
+                .build());
+        String tokenLoc = tokenProvider.generateToken(ownerLoc);
+
+        CreateMessRequest request = CreateMessRequest.builder()
+                .name("Exact Pinned Mess")
+                .description("Accurate physical entrance pin")
+                .address("Shop 3, Near MIT Backgate, Paud Road")
+                .locality("Kothrud")
+                .city("Pune")
+                .pincode("411038")
+                .contact("+91 91111 22222")
+                .foodType("PURE_VEG")
+                .monthlyPrice(BigDecimal.valueOf(3800))
+                .dailyPrice(BigDecimal.valueOf(110))
+                .latitude(new BigDecimal("18.5186420"))
+                .longitude(new BigDecimal("73.8152140"))
+                .build();
+
+        mockMvc.perform(post("/api/owner/mess")
+                        .header("Authorization", "Bearer " + tokenLoc)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.success", is(true)))
+                .andExpect(jsonPath("$.data.latitude", is(18.518642)))
+                .andExpect(jsonPath("$.data.longitude", is(73.815214)));
+
+        // Verify retrieval on fresh request
+        mockMvc.perform(get("/api/v1/owner/mess")
+                        .header("Authorization", "Bearer " + tokenLoc))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success", is(true)))
+                .andExpect(jsonPath("$.data.latitude", is(18.518642)))
+                .andExpect(jsonPath("$.data.longitude", is(73.815214)));
+    }
+
+    @Test
+    @DisplayName("20. Feature: Reject registration when only one coordinate is supplied")
+    void shouldRejectRegistrationWithMissingComplementaryCoordinate() throws Exception {
+        User ownerIncomplete = userRepository.save(User.builder()
+                .name("Incomplete Owner")
+                .email("incomplete.loc@test.com")
+                .password(passwordEncoder.encode("password123"))
+                .phone("+91 93333 44444")
+                .role(Role.ROLE_MESS_OWNER)
+                .status(UserStatus.ACTIVE)
+                .build());
+        String tokenIncomplete = tokenProvider.generateToken(ownerIncomplete);
+
+        CreateMessRequest req = CreateMessRequest.builder()
+                .name("Incomplete Coords Mess")
+                .address("Some Address")
+                .locality("Shivajinagar")
+                .city("Pune")
+                .contact("+91 93333 44444")
+                .latitude(new BigDecimal("18.5204"))
+                .longitude(null) // missing longitude
+                .build();
+
+        mockMvc.perform(post("/api/owner/mess")
+                        .header("Authorization", "Bearer " + tokenIncomplete)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success", is(false)))
+                .andExpect(jsonPath("$.status", is(400)))
+                .andExpect(jsonPath("$.message", containsString("Latitude and longitude must both be provided together")));
+    }
+
+    @Test
+    @DisplayName("21. Feature: Update coordinates via profile edit and verify persistence")
+    void shouldUpdateAndPersistNewCoordinatesOnProfileEdit() throws Exception {
+        UpdateMessProfileRequest updateReq = UpdateMessProfileRequest.builder()
+                .latitude(new BigDecimal("18.5350120"))
+                .longitude(new BigDecimal("73.8380450"))
+                .build();
+
+        mockMvc.perform(put("/api/v1/owner/mess/profile")
+                        .header("Authorization", "Bearer " + tokenOwnerA)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(updateReq)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success", is(true)))
+                .andExpect(jsonPath("$.data.latitude", is(18.535012)))
+                .andExpect(jsonPath("$.data.longitude", is(73.838045)));
+    }
 }

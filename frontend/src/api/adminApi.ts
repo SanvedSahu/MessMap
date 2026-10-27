@@ -47,7 +47,9 @@ export interface AdminMess {
   city?: string;
   state?: string;
   pincode?: string;
-  foodType: 'PURE_VEG' | 'VEG_NON_VEG' | 'JAIN';
+  latitude?: number;
+  longitude?: number;
+  foodType: 'PURE_VEG' | 'VEG_AND_NON_VEG' | 'JAIN_FRIENDLY' | 'VEG_NON_VEG' | 'JAIN';
   dailyPrice?: number;
   monthlyPrice?: number;
   status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'SUSPENDED' | 'REMOVED';

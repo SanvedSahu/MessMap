@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useOutletContext } from 'react-router-dom';
 import {
   MessageSquare,
   Search,
@@ -8,6 +9,8 @@ import {
   Clock,
   Sparkles
 } from 'lucide-react';
+import { useAuth } from '../../../context/AuthContext';
+import type { OwnerOutletContextType } from '../layouts/OwnerLayout';
 import './EnquiriesPage.css';
 
 interface Enquiry {
@@ -67,9 +70,14 @@ const mockEnquiries: Enquiry[] = [
 ];
 
 export const EnquiriesPage: React.FC = () => {
+  const { user } = useAuth();
+  const outletCtx = useOutletContext<OwnerOutletContextType | null>();
+  const isDemoOwner = user.email === 'rajesh.sharma@annapurnamess.com' || user.messId === 'MESS-101';
+  const displayMessName = outletCtx?.ownerMess?.name || user.messName || (isDemoOwner ? 'Annapurna Mess' : 'My Mess');
+
   const [filter, setFilter] = useState<'all' | 'new' | 'replied'>('all');
   const [search, setSearch] = useState('');
-  const [enquiries, setEnquiries] = useState<Enquiry[]>(mockEnquiries);
+  const [enquiries, setEnquiries] = useState<Enquiry[]>(() => (isDemoOwner ? mockEnquiries : []));
   const [replyInputId, setReplyInputId] = useState<string | null>(null);
   const [replyText, setReplyText] = useState('');
 
@@ -198,7 +206,7 @@ export const EnquiriesPage: React.FC = () => {
                 <a
                   href={`https://wa.me/${item.phone.replace(/[^0-9]/g, '')}?text=Hello%20${encodeURIComponent(
                     item.studentName
-                  )},%20this%20is%20Annapurna%20Mess.%20Regarding%20your%20enquiry:`}
+                  )},%20this%20is%20${encodeURIComponent(displayMessName)}.%20Regarding%20your%20enquiry:`}
                   target="_blank"
                   rel="noreferrer"
                   className="btn btn-green-subtle"
@@ -254,7 +262,11 @@ export const EnquiriesPage: React.FC = () => {
           <div className="empty-enquiries-card">
             <MessageSquare size={44} className="empty-icon" />
             <h3>No enquiries found</h3>
-            <p>You have responded to all enquiries in this category.</p>
+            <p>
+              {enquiries.length === 0
+                ? 'No customer enquiries received yet. When students submit enquiries for your mess, they will appear here.'
+                : 'You have responded to all enquiries in this category.'}
+            </p>
           </div>
         )}
       </div>

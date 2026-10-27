@@ -21,9 +21,11 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from 'react-leaflet';
+import { useOutletContext } from 'react-router-dom';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { useAuth } from '../../../context/AuthContext';
+import type { OwnerOutletContextType } from '../layouts/OwnerLayout';
 import {
   getOwnerProfileApi,
   updateOwnerProfileApi,
@@ -88,6 +90,7 @@ const MapEventsHandler: React.FC<{
 
 export const ProfilePage: React.FC = () => {
   const { user, updateProfile } = useAuth();
+  const outletCtx = useOutletContext<OwnerOutletContextType | null>();
   const isDemoOwner = user.email === 'rajesh.sharma@annapurnamess.com';
   const storageKey = `messmap_owner_profile_${user.id}`;
 
@@ -106,6 +109,7 @@ export const ProfilePage: React.FC = () => {
 
   // Track if this owner has an active mess profile
   const [hasMess, setHasMess] = useState<boolean>(() => {
+    if (outletCtx?.ownerMess) return true;
     if (user.messId) return true;
     if (isDemoOwner) return true;
     if (savedProfile?.messName) return true;
@@ -258,6 +262,34 @@ export const ProfilePage: React.FC = () => {
         });
     }
   }, [user.id, isDemoOwner]);
+
+  // Synchronize form fields whenever active owner mess is switched or loaded
+  useEffect(() => {
+    if (outletCtx?.ownerMess) {
+      setHasMess(true);
+      const m = outletCtx.ownerMess;
+      if (m.name) setMessName(m.name);
+      if (m.phone) setPhone(m.phone);
+      if (m.email) setEmail(m.email);
+      if (m.monthlyPrice != null) setMonthlyPrice(String(m.monthlyPrice));
+      if (m.dailyPrice != null) setDailyPrice(String(m.dailyPrice));
+      if (m.description) setDescription(m.description);
+      if (m.breakfastTiming) setBreakfastTiming(m.breakfastTiming);
+      if (m.lunchTiming) setLunchTiming(m.lunchTiming);
+      if (m.dinnerTiming) setDinnerTiming(m.dinnerTiming);
+      if (m.amenities && m.amenities.length > 0) {
+        setAmenities(m.amenities);
+      }
+      setLocation((prev) => ({
+        address: m.address || prev.address,
+        area: m.area || prev.area,
+        city: m.city || prev.city,
+        pincode: m.pincode || prev.pincode,
+        latitude: m.latitude != null ? Number(m.latitude) : prev.latitude,
+        longitude: m.longitude != null ? Number(m.longitude) : prev.longitude,
+      }));
+    }
+  }, [outletCtx?.ownerMess]);
 
   const commonAmenities = [
     'RO Filtered Water',
@@ -463,6 +495,14 @@ export const ProfilePage: React.FC = () => {
       }
     } catch (err: any) {
       console.warn('Backend sync warning:', err.message);
+    }
+
+    if (outletCtx?.refreshOwnerMess) {
+      try {
+        await outletCtx.refreshOwnerMess();
+      } catch {
+        // ignore
+      }
     }
 
     setHasMess(true);

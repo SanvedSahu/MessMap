@@ -94,6 +94,52 @@ public class MessController {
     }
 
     /**
+     * Discover nearby approved messes based on student device latitude, longitude, and radius.
+     * Routes: GET /api/messes/nearby, GET /api/v1/messes/nearby
+     *
+     * @param latitude   Search origin latitude (-90 to 90)
+     * @param longitude  Search origin longitude (-180 to 180)
+     * @param radiusKm   Search radius in kilometers (default 5.0, must be > 0 and <= 100)
+     * @param search     Optional keyword search
+     * @param foodType   Optional dietary filter
+     * @param minPrice   Optional minimum price
+     * @param maxPrice   Optional maximum price
+     * @param includeClosed Optional flag to include closed messes
+     * @return List of nearby messes ordered by distance from nearest to farthest
+     */
+    @GetMapping({"/api/messes/nearby", "/api/v1/messes/nearby"})
+    public ResponseEntity<ApiResponse<List<MessSummaryResponse>>> getNearbyMesses(
+            @RequestParam(name = "latitude") Double latitude,
+            @RequestParam(name = "longitude") Double longitude,
+            @RequestParam(name = "radiusKm", required = false, defaultValue = "5.0") Double radiusKm,
+            @RequestParam(name = "search", required = false) String search,
+            @RequestParam(name = "foodType", required = false) String foodType,
+            @RequestParam(name = "minPrice", required = false) BigDecimal minPrice,
+            @RequestParam(name = "maxPrice", required = false) BigDecimal maxPrice,
+            @RequestParam(name = "includeClosed", required = false) Boolean includeClosed
+    ) {
+        log.info("GET /api/messes/nearby: lat={}, lng={}, radiusKm={}, search='{}', foodType='{}'",
+                latitude, longitude, radiusKm, search, foodType);
+
+        MessFilterRequest filter = MessFilterRequest.builder()
+                .search(search)
+                .foodType(foodType)
+                .minPrice(minPrice)
+                .maxPrice(maxPrice)
+                .includeClosed(includeClosed)
+                .build();
+
+        List<MessSummaryResponse> nearbyMesses = messDiscoveryService.getNearbyApprovedMesses(
+                latitude, longitude, radiusKm, filter
+        );
+
+        return ResponseEntity.ok(ApiResponse.success(
+                "Nearby approved messes retrieved successfully (" + nearbyMesses.size() + " found within " + (radiusKm != null ? radiusKm : 5.0) + " km)",
+                nearbyMesses
+        ));
+    }
+
+    /**
      * Retrieve full profile details and active menu items for a specific approved mess.
      * Accessible via GET /api/messes/{id} and GET /api/v1/messes/{id}.
      * Returns 404 for nonexistent messes and unapproved (PENDING, REJECTED, SUSPENDED) messes.

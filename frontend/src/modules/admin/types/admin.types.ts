@@ -10,6 +10,8 @@ export interface Mess {
   ownerEmail: string;
   address: string;
   area: string;
+  latitude?: number;
+  longitude?: number;
   foodType: FoodType;
   monthlyPrice: number;
   dailyPrice: number;

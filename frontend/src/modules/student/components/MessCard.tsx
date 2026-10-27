@@ -5,6 +5,7 @@ import { FoodBadge, StatusBadge } from '../../../components/ui/Badge';
 import { useFavorites } from '../../../context/FavoritesContext';
 import { useNotification } from '../../../context/NotificationContext';
 import { MessItem } from '../../../types/student.types';
+import { formatDistance } from '../../../utils/geocoding';
 
 export interface MessCardProps {
   mess: MessItem;
@@ -127,7 +128,7 @@ export const MessCard: React.FC<MessCardProps> = ({ mess, onSubscribeClick }) =>
               gap: '4px',
             }}
           >
-            <MapPin size={14} color="#34d399" /> {mess.distanceKm} km away
+            <MapPin size={14} color="#34d399" /> {formatDistance(mess.distanceKm) || mess.area || mess.city || 'Campus Area'}
           </span>
           <span
             style={{

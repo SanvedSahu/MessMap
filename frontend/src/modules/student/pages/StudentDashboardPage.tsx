@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Compass,
@@ -12,29 +12,144 @@ import {
   CheckCircle2,
   ChefHat,
   Coffee,
+  Crosshair,
+  RefreshCw,
+  X,
+  AlertCircle,
 } from 'lucide-react';
-import { mockMesses } from '../../../data/mockMesses';
-import { useMessData } from '../../../context/MessDataContext';
+import { getMessesApi, adaptMessSummaryToMessItem } from '../../../api/studentApi';
 import { MessCard } from '../components/MessCard';
 import { useAuth } from '../../../context/AuthContext';
 import { useFavorites } from '../../../context/FavoritesContext';
 import { MessItem } from '../../../types/student.types';
+import { calculateHaversineDistanceKm, isValidCoordinates } from '../../../utils/geocoding';
 
 export const StudentDashboardPage: React.FC = () => {
   const { user } = useAuth();
   const { favorites } = useFavorites();
-  const { approvedMesses } = useMessData();
 
-  // Live approved messes with fallback
-  const liveMesses: MessItem[] = (approvedMesses && approvedMesses.length > 0
-    ? (approvedMesses as unknown as MessItem[])
-    : (mockMesses as unknown as MessItem[]));
+  // Live approved messes from backend GET /api/messes
+  const [liveMesses, setLiveMesses] = useState<MessItem[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Student device location state
+  const [studentLocation, setStudentLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [isLocating, setIsLocating] = useState<boolean>(false);
+  const [locationError, setLocationError] = useState<string | null>(null);
+
+  const handleUseCurrentLocation = () => {
+    if (!navigator.geolocation) {
+      setLocationError('Geolocation is not supported by your browser.');
+      return;
+    }
+    setIsLocating(true);
+    setLocationError(null);
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setIsLocating(false);
+        const lat = Number(pos.coords.latitude.toFixed(6));
+        const lng = Number(pos.coords.longitude.toFixed(6));
+        if (isValidCoordinates(lat, lng)) {
+          setStudentLocation({ lat, lng });
+          setLocationError(null);
+        } else {
+          setLocationError('Device returned invalid geographic coordinates.');
+        }
+      },
+      (err) => {
+        setIsLocating(false);
+        switch (err.code) {
+          case err.PERMISSION_DENIED:
+            setLocationError('Location permission was denied. Please allow access in browser settings.');
+            break;
+          case err.POSITION_UNAVAILABLE:
+            setLocationError('Device location is unavailable.');
+            break;
+          case err.TIMEOUT:
+            setLocationError('Location request timed out. Please retry.');
+            break;
+          default:
+            setLocationError('Unable to detect device location.');
+            break;
+        }
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+  };
+
+  const handleClearLocation = () => {
+    setStudentLocation(null);
+    setLocationError(null);
+  };
+
+  useEffect(() => {
+    let isCurrent = true;
+    setIsLoading(true);
+    setError(null);
+
+    getMessesApi()
+      .then((res) => {
+        if (!isCurrent) return;
+        if (res && res.data && Array.isArray(res.data)) {
+          const adapted = res.data.map(adaptMessSummaryToMessItem);
+          setLiveMesses(adapted);
+        } else {
+          setLiveMesses([]);
+        }
+      })
+      .catch((err: any) => {
+        if (!isCurrent) return;
+        console.error('[StudentDashboardPage] Failed to fetch live messes from API:', err);
+        setError(err?.message || 'Failed to load approved messes from backend.');
+      })
+      .finally(() => {
+        if (isCurrent) {
+          setIsLoading(false);
+        }
+      });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, []);
 
   // Filter messes
-  const featuredMesses = liveMesses.filter((m) => m.rating >= 4.6);
-  const nearbyMesses = [...liveMesses]
-    .sort((a, b) => (a.distanceKm || 1) - (b.distanceKm || 1))
-    .slice(0, 3);
+  const featuredMesses = useMemo(() => {
+    const highlyRated = liveMesses.filter((m) => m.rating >= 4.6);
+    return highlyRated.length > 0 ? highlyRated : liveMesses.slice(0, 3);
+  }, [liveMesses]);
+
+  const nearbyMesses = useMemo(() => {
+    if (studentLocation) {
+      // Calculate actual distances from student location
+      const withDistances = liveMesses
+        .filter((m) => isValidCoordinates(m.lat, m.lng))
+        .map((m) => {
+          const dist = calculateHaversineDistanceKm(
+            studentLocation.lat,
+            studentLocation.lng,
+            m.lat,
+            m.lng
+          );
+          return {
+            ...m,
+            distanceKm: !isNaN(dist) ? dist : m.distanceKm,
+          };
+        });
+      withDistances.sort((a, b) => a.distanceKm - b.distanceKm);
+      return withDistances.slice(0, 3);
+    }
+
+    return [...liveMesses]
+      .sort((a, b) => {
+        const da = typeof a.distanceKm === 'number' && !isNaN(a.distanceKm) ? a.distanceKm : Infinity;
+        const db = typeof b.distanceKm === 'number' && !isNaN(b.distanceKm) ? b.distanceKm : Infinity;
+        return da - db;
+      })
+      .slice(0, 3);
+  }, [liveMesses, studentLocation]);
 
   return (
     <div>
@@ -444,14 +559,40 @@ export const StudentDashboardPage: React.FC = () => {
           </Link>
         </div>
 
-        <div className="grid-cols-auto">
-          {featuredMesses.slice(0, 3).map((mess) => (
-            <MessCard
-              key={mess.id}
-              mess={mess}
+        {isLoading ? (
+          <div style={{ textAlign: 'center', padding: '3rem 1rem', color: 'var(--text-muted)' }}>
+            <div
+              style={{
+                width: '32px',
+                height: '32px',
+                borderRadius: '50%',
+                border: '3px solid var(--border-color)',
+                borderTopColor: 'var(--primary)',
+                animation: 'spin 0.8s linear infinite',
+                margin: '0 auto 12px',
+              }}
             />
-          ))}
-        </div>
+            <p style={{ fontSize: '0.9rem', margin: 0 }}>Loading verified campus dining spots...</p>
+          </div>
+        ) : error && liveMesses.length === 0 ? (
+          <div style={{ padding: '2rem', textAlign: 'center', background: 'var(--bg-card)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
+            <p style={{ color: 'var(--danger)', fontSize: '0.95rem', fontWeight: 600, marginBottom: '6px' }}>{error}</p>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', margin: 0 }}>Please check your network or try refreshing.</p>
+          </div>
+        ) : liveMesses.length === 0 ? (
+          <div style={{ padding: '2rem', textAlign: 'center', background: 'var(--bg-card)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', margin: 0 }}>No approved messes available currently.</p>
+          </div>
+        ) : (
+          <div className="grid-cols-auto">
+            {featuredMesses.slice(0, 3).map((mess) => (
+              <MessCard
+                key={mess.id}
+                mess={mess}
+              />
+            ))}
+          </div>
+        )}
       </section>
 
       {/* 4. NEARBY MESSES */}
@@ -461,6 +602,8 @@ export const StudentDashboardPage: React.FC = () => {
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'flex-end',
+            flexWrap: 'wrap',
+            gap: '12px',
             marginBottom: '1.25rem',
           }}
         >
@@ -478,33 +621,130 @@ export const StudentDashboardPage: React.FC = () => {
             >
               <MapPin size={14} /> Walking Distance
             </div>
-            <h2 style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--text-main)' }}>
+            <h2 style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--text-main)', margin: '4px 0 0 0' }}>
               Closest Messes to Your Hostel
             </h2>
           </div>
-          <Link
-            to="/find-mess?view=map"
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              onClick={handleUseCurrentLocation}
+              disabled={isLocating}
+              className={`btn btn-sm ${studentLocation ? 'btn-success' : 'btn-outline'}`}
+              style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 700 }}
+            >
+              {isLocating ? <RefreshCw size={14} className="spin" /> : <Crosshair size={14} />}
+              {isLocating ? 'Detecting GPS...' : studentLocation ? 'Update Location' : 'Use My Current Location'}
+            </button>
+
+            {studentLocation && (
+              <button
+                type="button"
+                onClick={handleClearLocation}
+                className="btn btn-ghost btn-sm"
+                style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}
+              >
+                <X size={14} /> Clear Location / Show All
+              </button>
+            )}
+
+            <Link
+              to="/find-mess?view=map"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                color: 'var(--primary-dark)',
+                fontWeight: 700,
+                fontSize: '0.9rem',
+                marginLeft: '6px',
+              }}
+            >
+              Open Interactive Map <ArrowRight size={16} />
+            </Link>
+          </div>
+        </div>
+
+        {/* Location Status or Error Banner */}
+        {studentLocation && (
+          <div
+            style={{
+              padding: '6px 12px',
+              background: '#ecfdf5',
+              border: '1px solid #a7f3d0',
+              borderRadius: '6px',
+              fontSize: '0.78rem',
+              color: '#065f46',
+              marginBottom: '1rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+            }}
+          >
+            <span>📍 Messes ordered by real distance from your coordinates ({studentLocation.lat.toFixed(4)}° N, {studentLocation.lng.toFixed(4)}° E)</span>
+          </div>
+        )}
+
+        {locationError && (
+          <div
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '4px',
-              color: 'var(--primary-dark)',
-              fontWeight: 700,
-              fontSize: '0.9rem',
+              justifyContent: 'space-between',
+              gap: '8px',
+              background: '#fef2f2',
+              border: '1px solid #fecaca',
+              color: '#991b1b',
+              padding: '8px 12px',
+              borderRadius: '6px',
+              fontSize: '0.82rem',
+              marginBottom: '1rem',
             }}
           >
-            Open Interactive Map <ArrowRight size={16} />
-          </Link>
-        </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <AlertCircle size={16} />
+              <span>{locationError}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setLocationError(null)}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#991b1b' }}
+            >
+              <X size={14} />
+            </button>
+          </div>
+        )}
 
-        <div className="grid-cols-auto">
-          {nearbyMesses.map((mess) => (
-            <MessCard
-              key={mess.id}
-              mess={mess}
+        {isLoading ? (
+          <div style={{ textAlign: 'center', padding: '3rem 1rem', color: 'var(--text-muted)' }}>
+            <div
+              style={{
+                width: '32px',
+                height: '32px',
+                borderRadius: '50%',
+                border: '3px solid var(--border-color)',
+                borderTopColor: 'var(--primary)',
+                animation: 'spin 0.8s linear infinite',
+                margin: '0 auto 12px',
+              }}
             />
-          ))}
-        </div>
+            <p style={{ fontSize: '0.9rem', margin: 0 }}>Finding nearby messes...</p>
+          </div>
+        ) : liveMesses.length === 0 ? (
+          <div style={{ padding: '2rem', textAlign: 'center', background: 'var(--bg-card)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', margin: 0 }}>No nearby messes found.</p>
+          </div>
+        ) : (
+          <div className="grid-cols-auto">
+            {nearbyMesses.map((mess) => (
+              <MessCard
+                key={mess.id}
+                mess={mess}
+              />
+            ))}
+          </div>
+        )}
       </section>
 
       {/* 5. TODAY'S MENU TEASER BANNER */}

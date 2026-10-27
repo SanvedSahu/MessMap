@@ -92,6 +92,7 @@ export interface MessMapViewProps {
   selectedMessId?: string | null;
   onSelectMess?: ((id: string) => void) | null;
   height?: string;
+  studentPos?: [number, number] | null;
 }
 
 export const MessMapView: React.FC<MessMapViewProps> = ({
@@ -99,10 +100,20 @@ export const MessMapView: React.FC<MessMapViewProps> = ({
   selectedMessId = null,
   onSelectMess = null,
   height = '500px',
+  studentPos = null,
 }) => {
-  const studentPos: [number, number] = [18.5204, 73.8402];
-  const [center, setCenter] = useState<LatLngExpression>(studentPos);
+  const defaultCampusPos: [number, number] = [18.5204, 73.8402];
+  const activeStudentPos: [number, number] = studentPos || defaultCampusPos;
+  const [center, setCenter] = useState<LatLngExpression>(activeStudentPos);
   const [zoom, setZoom] = useState(14);
+
+  // Sync center when student position updates and no mess is explicitly selected
+  useEffect(() => {
+    if (studentPos && !selectedMessId) {
+      setCenter(studentPos);
+      setZoom(15);
+    }
+  }, [studentPos, selectedMessId]);
 
   useEffect(() => {
     if (selectedMessId) {
@@ -115,7 +126,7 @@ export const MessMapView: React.FC<MessMapViewProps> = ({
   }, [selectedMessId, messes]);
 
   const handleCenterOnMe = () => {
-    setCenter(studentPos);
+    setCenter(activeStudentPos);
     setZoom(15);
   };
 
@@ -145,80 +156,96 @@ export const MessMapView: React.FC<MessMapViewProps> = ({
         />
 
         {/* Student Location Marker */}
-        <Marker position={studentPos} icon={studentIcon}>
+        <Marker position={activeStudentPos} icon={studentIcon}>
           <Popup>
             <div style={{ padding: '4px', textAlign: 'center' }}>
               <div style={{ fontWeight: 800, fontSize: '0.85rem', color: 'var(--primary-dark)' }}>
-                📍 Your Hostel Campus
+                📍 {studentPos ? 'Your Current Location' : 'Your Campus Location'}
               </div>
               <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                Fergusson College & Hostels
+                {studentPos
+                  ? `${activeStudentPos[0].toFixed(4)}° N, ${activeStudentPos[1].toFixed(4)}° E`
+                  : 'Fergusson College & Hostels'}
               </div>
             </div>
           </Popup>
         </Marker>
 
         {/* Mess Markers */}
-        {messes.map((mess) => {
-          const isSelected = mess.id === selectedMessId;
-          return (
-            <Marker
-              key={mess.id}
-              position={[mess.lat, mess.lng]}
-              icon={createMessIcon(mess.foodType, isSelected)}
-              eventHandlers={{
-                click: () => {
-                  if (onSelectMess) onSelectMess(mess.id);
-                },
-              }}
-            >
-              <Popup>
-                <div style={{ width: '220px', padding: '4px' }}>
-                  <img
-                    src={mess.heroImage}
-                    alt={mess.name}
-                    style={{
-                      width: '100%',
-                      height: '95px',
-                      objectFit: 'cover',
-                      borderRadius: 'var(--radius-sm)',
-                      marginBottom: '8px',
-                    }}
-                  />
-                  <div
-                    style={{
-                      fontWeight: 800,
-                      fontSize: '0.95rem',
-                      color: 'var(--text-main)',
-                      marginBottom: '2px',
-                    }}
-                  >
-                    {mess.name}
-                  </div>
-                  <div
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px',
-                      marginBottom: '6px',
-                    }}
-                  >
-                    <span
+        {messes
+          .filter(
+            (m) =>
+              typeof m.lat === 'number' &&
+              typeof m.lng === 'number' &&
+              !isNaN(m.lat) &&
+              !isNaN(m.lng)
+          )
+          .map((mess) => {
+            const isSelected = mess.id === selectedMessId;
+            return (
+              <Marker
+                key={mess.id}
+                position={[mess.lat, mess.lng]}
+                icon={createMessIcon(mess.foodType, isSelected)}
+                eventHandlers={{
+                  click: () => {
+                    if (onSelectMess) onSelectMess(mess.id);
+                  },
+                }}
+              >
+                <Popup>
+                  <div style={{ width: '220px', padding: '4px' }}>
+                    <img
+                      src={mess.heroImage}
+                      alt={mess.name}
                       style={{
-                        fontSize: '0.75rem',
-                        fontWeight: 700,
-                        color: 'var(--warning)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '2px',
+                        width: '100%',
+                        height: '95px',
+                        objectFit: 'cover',
+                        borderRadius: 'var(--radius-sm)',
+                        marginBottom: '8px',
+                      }}
+                    />
+                    <div
+                      style={{
+                        fontWeight: 800,
+                        fontSize: '0.95rem',
+                        color: 'var(--text-main)',
+                        marginBottom: '2px',
                       }}
                     >
-                      ★ {mess.rating}
-                    </span>
-                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                      • {mess.distanceKm} km away
-                    </span>
-                  </div>
+                      {mess.name}
+                    </div>
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        marginBottom: '6px',
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontSize: '0.75rem',
+                          fontWeight: 700,
+                          color: 'var(--warning)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '2px',
+                        }}
+                      >
+                        ★ {mess.rating}
+                      </span>
+                      {typeof mess.distanceKm === 'number' && !isNaN(mess.distanceKm) ? (
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                          • {mess.distanceKm < 1 ? `${Math.round(mess.distanceKm * 1000)} m away` : `${mess.distanceKm.toFixed(1)} km away`}
+                        </span>
+                      ) : mess.area ? (
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                          • {mess.area}
+                        </span>
+                      ) : null}
+                    </div>
                   <div
                     style={{
                       display: 'flex',

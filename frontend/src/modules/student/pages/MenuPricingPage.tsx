@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Sparkles,
@@ -7,13 +7,19 @@ import {
   Coffee,
   Sun,
   Moon,
+  Loader2,
+  AlertCircle,
+  RefreshCw,
 } from 'lucide-react';
-import { mockMesses } from '../../../data/mockMesses';
 import { MessItem } from '../../../types/student.types';
+import { getMessesApi, adaptMessSummaryToMessItem } from '../../../api/studentApi';
 
 export const MenuPricingPage: React.FC = () => {
   const [selectedDay, setSelectedDay] = useState<string>('Today');
-  const [selectedMessId, setSelectedMessId] = useState<string>(mockMesses[0].id);
+  const [selectedMessId, setSelectedMessId] = useState<string>('');
+  const [messes, setMesses] = useState<MessItem[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
 
   // Interactive Student Calculator State
   const [calcMealsPerDay, setCalcMealsPerDay] = useState<number>(2);
@@ -21,8 +27,31 @@ export const MenuPricingPage: React.FC = () => {
   const [calcDiet, setCalcDiet] = useState<'veg' | 'nonveg'>('veg');
   const [calcDelivery, setCalcDelivery] = useState<boolean>(false);
 
-  const selectedMess = ((mockMesses.find((m) => m.id === selectedMessId) ||
-    mockMesses[0]) as unknown) as MessItem;
+  const fetchMesses = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const res = await getMessesApi();
+      if (res.data && res.data.length > 0) {
+        const adapted = res.data.map(adaptMessSummaryToMessItem);
+        setMesses(adapted);
+        setSelectedMessId((prev) => (prev && adapted.some((m) => m.id === prev) ? prev : adapted[0].id));
+      } else {
+        setMesses([]);
+      }
+    } catch (err: any) {
+      console.error('[MenuPricingPage] Failed to fetch messes from API:', err);
+      setError('Unable to load mess list. Please check your network or try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchMesses();
+  }, []);
+
+  const selectedMess = messes.find((m) => m.id === selectedMessId) || messes[0];
 
   const baseRatePerDay =
     calcDiet === 'veg'
@@ -93,11 +122,121 @@ export const MenuPricingPage: React.FC = () => {
     selectedDay === 'Today'
       ? {
           breakfast:
-            selectedMess.todayMenu?.breakfast?.dish || 'Poha with roasted peanuts & tea',
-          lunch: `${selectedMess.todayMenu?.lunch?.sabji1}, ${selectedMess.todayMenu?.lunch?.sabji2}, ${selectedMess.todayMenu?.lunch?.dal}, ${selectedMess.todayMenu?.lunch?.bread}`,
-          dinner: `${selectedMess.todayMenu?.dinner?.sabji1}, ${selectedMess.todayMenu?.dinner?.sabji2}, ${selectedMess.todayMenu?.dinner?.dal}, ${selectedMess.todayMenu?.dinner?.bread}`,
+            (selectedMess as any)?.todayMenu?.breakfast?.dish || 'Poha with roasted peanuts & tea',
+          lunch: (selectedMess as any)?.todayMenu?.lunch?.sabji1
+            ? `${(selectedMess as any).todayMenu.lunch.sabji1}, ${(selectedMess as any).todayMenu.lunch.sabji2}, ${(selectedMess as any).todayMenu.lunch.dal}, ${(selectedMess as any).todayMenu.lunch.bread}`
+            : 'Paneer Bhurji, Dal Tadka, Steamed Rice, 4 Phulkas, Salad',
+          dinner: (selectedMess as any)?.todayMenu?.dinner?.sabji1
+            ? `${(selectedMess as any).todayMenu.dinner.sabji1}, ${(selectedMess as any).todayMenu.dinner.sabji2}, ${(selectedMess as any).todayMenu.dinner.dal}, ${(selectedMess as any).todayMenu.dinner.bread}`
+            : 'Aloo Gobi Matar, Moong Dal Fry, Kolam Rice, Phulkas',
         }
       : weeklySchedule[selectedDay];
+
+  if (loading) {
+    return (
+      <div>
+        <div style={{ marginBottom: '2rem' }}>
+          <div
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              background: 'var(--primary-light)',
+              color: 'var(--primary-dark)',
+              padding: '4px 12px',
+              borderRadius: 'var(--radius-full)',
+              fontSize: '0.8rem',
+              fontWeight: 700,
+              marginBottom: '0.65rem',
+            }}
+          >
+            <Sparkles size={14} /> Full Transparency
+          </div>
+          <h1
+            style={{
+              fontSize: '2rem',
+              fontWeight: 800,
+              marginBottom: '0.4rem',
+              color: 'var(--text-main)',
+            }}
+          >
+            Weekly Menus & Student Subscription Pricing
+          </h1>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem' }}>
+            Check day-by-day food menus, compare meal packages, and calculate custom subscription fees.
+          </p>
+        </div>
+        <div className="card" style={{ textAlign: 'center', padding: '3.5rem 1rem' }}>
+          <Loader2
+            size={36}
+            className="animate-spin"
+            style={{ margin: '0 auto 1rem', color: 'var(--primary)' }}
+          />
+          <p style={{ fontWeight: 600, color: 'var(--text-muted)' }}>
+            Loading approved campus messes & pricing...
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || messes.length === 0) {
+    return (
+      <div>
+        <div style={{ marginBottom: '2rem' }}>
+          <div
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              background: 'var(--primary-light)',
+              color: 'var(--primary-dark)',
+              padding: '4px 12px',
+              borderRadius: 'var(--radius-full)',
+              fontSize: '0.8rem',
+              fontWeight: 700,
+              marginBottom: '0.65rem',
+            }}
+          >
+            <Sparkles size={14} /> Full Transparency
+          </div>
+          <h1
+            style={{
+              fontSize: '2rem',
+              fontWeight: 800,
+              marginBottom: '0.4rem',
+              color: 'var(--text-main)',
+            }}
+          >
+            Weekly Menus & Student Subscription Pricing
+          </h1>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem' }}>
+            Check day-by-day food menus, compare meal packages, and calculate custom subscription fees.
+          </p>
+        </div>
+        <div className="card" style={{ textAlign: 'center', padding: '3rem 1.5rem' }}>
+          <AlertCircle
+            size={40}
+            style={{ margin: '0 auto 1rem', color: error ? 'var(--danger)' : 'var(--warning)' }}
+          />
+          <h3 style={{ fontSize: '1.2rem', fontWeight: 800, marginBottom: '0.5rem' }}>
+            {error ? 'Failed to Load Menus' : 'No Approved Messes Found'}
+          </h3>
+          <p style={{ color: 'var(--text-muted)', marginBottom: '1.5rem', maxWidth: '400px', margin: '0 auto 1.5rem' }}>
+            {error || 'There are currently no approved messes available for viewing.'}
+          </p>
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={fetchMesses}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}
+          >
+            <RefreshCw size={16} /> Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -166,7 +305,7 @@ export const MenuPricingPage: React.FC = () => {
               onChange={(e) => setSelectedMessId(e.target.value)}
               style={{ width: 'auto', padding: '0.45rem 0.85rem', fontWeight: 700 }}
             >
-              {mockMesses.map((m) => (
+              {messes.map((m) => (
                 <option key={m.id} value={m.id}>
                   {m.name} ({m.foodType})
                 </option>

@@ -214,6 +214,11 @@ export const MessDetailModal: React.FC<MessDetailModalProps> = ({
             <div style={{ fontSize: '0.825rem', color: 'var(--text-muted)', marginTop: '0.35rem' }}>
               {mess.address}
             </div>
+            {mess.latitude != null && mess.longitude != null && (
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.25rem', fontFamily: 'monospace' }}>
+                📍 Coordinates: {Number(mess.latitude).toFixed(6)}, {Number(mess.longitude).toFixed(6)}
+              </div>
+            )}
             <div style={{ fontSize: '0.75rem', color: 'var(--primary)', marginTop: '0.25rem', fontWeight: 600 }}>
               Campus Seating Capacity: {mess.capacity || 60} students
             </div>

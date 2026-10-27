@@ -33,6 +33,7 @@ public class MessSummaryResponse {
     private String pincode;
     private BigDecimal latitude;
     private BigDecimal longitude;
+    private Double distanceKm;
     private FoodType foodType;
     private BigDecimal dailyPrice;
     private BigDecimal monthlyPrice;

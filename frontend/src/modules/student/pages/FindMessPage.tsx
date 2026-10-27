@@ -9,9 +9,13 @@ import {
   X,
   RotateCcw,
   RefreshCw,
+  Crosshair,
+  Compass,
+  AlertCircle,
 } from 'lucide-react';
 import {
   getMessesApi,
+  getNearbyMessesApi,
   adaptMessSummaryToMessItem,
   MessFilterParams,
 } from '../../../api/studentApi';
@@ -19,7 +23,11 @@ import { MessCard } from '../components/MessCard';
 import { MessMapView } from '../components/MessMapView';
 import { EmptyState } from '../../../components/ui/EmptyState';
 import { MessItem } from '../../../types/student.types';
-import { POPULAR_PUNE_AREAS } from '../../../utils/geocoding';
+import {
+  POPULAR_PUNE_AREAS,
+  calculateHaversineDistanceKm,
+  isValidCoordinates,
+} from '../../../utils/geocoding';
 
 export const FindMessPage: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -37,6 +45,13 @@ export const FindMessPage: React.FC = () => {
   const [onlyOpen, setOnlyOpen] = useState<boolean>(false);
   const [selectedMessId, setSelectedMessId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<string>(initialView);
+
+  // Student Geolocation & Nearby Discovery State
+  const [studentLocation, setStudentLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [isLocating, setIsLocating] = useState<boolean>(false);
+  const [locationError, setLocationError] = useState<string | null>(null);
+  const [isNearbyOnly, setIsNearbyOnly] = useState<boolean>(false);
+  const [nearbyRadiusKm, setNearbyRadiusKm] = useState<number>(5.0);
 
   // Backend Live State
   const [backendMesses, setBackendMesses] = useState<MessItem[]>([]);
@@ -68,64 +83,196 @@ export const FindMessPage: React.FC = () => {
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
-  // Fetch live messes from backend GET /api/messes
+  // Geolocation trigger
+  const handleUseCurrentLocation = () => {
+    if (!navigator.geolocation) {
+      setLocationError('Browser Geolocation is not supported by your current browser.');
+      return;
+    }
+    setIsLocating(true);
+    setLocationError(null);
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setIsLocating(false);
+        const lat = Number(pos.coords.latitude.toFixed(6));
+        const lng = Number(pos.coords.longitude.toFixed(6));
+        if (isValidCoordinates(lat, lng)) {
+          setStudentLocation({ lat, lng });
+          setIsNearbyOnly(true);
+          setLocationError(null);
+        } else {
+          setLocationError('Device returned invalid geographic coordinates.');
+        }
+      },
+      (err) => {
+        setIsLocating(false);
+        switch (err.code) {
+          case err.PERMISSION_DENIED:
+            setLocationError('Location permission was denied. Please allow location access in your browser or search by campus locality.');
+            break;
+          case err.POSITION_UNAVAILABLE:
+            setLocationError('Device location information is unavailable. You can continue searching by locality or college name.');
+            break;
+          case err.TIMEOUT:
+            setLocationError('Location request timed out. Please retry or filter by locality.');
+            break;
+          default:
+            setLocationError('Unable to detect current location. Please filter by campus locality.');
+            break;
+        }
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+  };
+
+  const handleClearLocation = () => {
+    setStudentLocation(null);
+    setIsNearbyOnly(false);
+    setLocationError(null);
+  };
+
+  // Fetch live messes from backend GET /api/messes or GET /api/messes/nearby
   useEffect(() => {
     let isCurrent = true;
     setIsLoading(true);
     setError(null);
 
-    const params: MessFilterParams = {
-      search: debouncedSearch.trim() || undefined,
-      foodType: selectedFoodType !== 'all' ? selectedFoodType : undefined,
-      locality: selectedLocality !== 'all' ? selectedLocality : undefined,
-      maxPrice: maxPrice < 4500 ? maxPrice : undefined,
-    };
-
-    getMessesApi(params)
-      .then((res) => {
-        if (!isCurrent) return;
-        if (res && Array.isArray(res.data)) {
-          const adapted = res.data.map(adaptMessSummaryToMessItem);
-          setBackendMesses(adapted);
-        } else {
+    if (isNearbyOnly && studentLocation) {
+      // Nearby discovery with student origin and radius
+      getNearbyMessesApi({
+        latitude: studentLocation.lat,
+        longitude: studentLocation.lng,
+        radiusKm: nearbyRadiusKm,
+        foodType: selectedFoodType !== 'all' ? selectedFoodType : undefined,
+        search: debouncedSearch.trim() || undefined,
+        maxPrice: maxPrice < 4500 ? maxPrice : undefined,
+      })
+        .then((res) => {
+          if (!isCurrent) return;
+          if (res && Array.isArray(res.data)) {
+            const adapted = res.data.map(adaptMessSummaryToMessItem);
+            // Ensure distance is accurately calculated and sorted
+            const withDistances = adapted.map((m) => {
+              const dist = calculateHaversineDistanceKm(
+                studentLocation.lat,
+                studentLocation.lng,
+                m.lat,
+                m.lng
+              );
+              return {
+                ...m,
+                distanceKm: !isNaN(dist) ? dist : m.distanceKm,
+              };
+            });
+            withDistances.sort((a, b) => {
+              const da = typeof a.distanceKm === 'number' && !isNaN(a.distanceKm) ? a.distanceKm : Infinity;
+              const db = typeof b.distanceKm === 'number' && !isNaN(b.distanceKm) ? b.distanceKm : Infinity;
+              return da - db;
+            });
+            setBackendMesses(withDistances);
+          } else {
+            setBackendMesses([]);
+          }
+        })
+        .catch((err: any) => {
+          if (!isCurrent) return;
+          setError(err?.message || 'Unable to fetch nearby messes.');
           setBackendMesses([]);
-        }
-      })
-      .catch((err: any) => {
-        if (!isCurrent) return;
-        setError(err?.message || 'Unable to connect to MessMap backend service.');
-        setBackendMesses([]);
-      })
-      .finally(() => {
-        if (isCurrent) {
-          setIsLoading(false);
-        }
-      });
+        })
+        .finally(() => {
+          if (isCurrent) {
+            setIsLoading(false);
+          }
+        });
+    } else {
+      // Standard discovery
+      const params: MessFilterParams = {
+        search: debouncedSearch.trim() || undefined,
+        foodType: selectedFoodType !== 'all' ? selectedFoodType : undefined,
+        locality: selectedLocality !== 'all' ? selectedLocality : undefined,
+        maxPrice: maxPrice < 4500 ? maxPrice : undefined,
+      };
+
+      getMessesApi(params)
+        .then((res) => {
+          if (!isCurrent) return;
+          if (res && Array.isArray(res.data)) {
+            const adapted = res.data.map(adaptMessSummaryToMessItem);
+            // If student location is known, calculate distances for standard list
+            if (studentLocation) {
+              const withDist = adapted.map((m) => {
+                const dist = calculateHaversineDistanceKm(
+                  studentLocation.lat,
+                  studentLocation.lng,
+                  m.lat,
+                  m.lng
+                );
+                return {
+                  ...m,
+                  distanceKm: !isNaN(dist) ? dist : m.distanceKm,
+                };
+              });
+              setBackendMesses(withDist);
+            } else {
+              setBackendMesses(adapted);
+            }
+          } else {
+            setBackendMesses([]);
+          }
+        })
+        .catch((err: any) => {
+          if (!isCurrent) return;
+          setError(err?.message || 'Unable to connect to MessMap backend service.');
+          setBackendMesses([]);
+        })
+        .finally(() => {
+          if (isCurrent) {
+            setIsLoading(false);
+          }
+        });
+    }
 
     return () => {
       isCurrent = false;
     };
-  }, [debouncedSearch, selectedFoodType, selectedLocality, maxPrice, refreshTrigger]);
+  }, [
+    debouncedSearch,
+    selectedFoodType,
+    selectedLocality,
+    maxPrice,
+    refreshTrigger,
+    isNearbyOnly,
+    studentLocation,
+    nearbyRadiusKm,
+  ]);
 
-  // Client-side secondary filters for rating, distance, open status
+  // Client-side secondary filters for rating, open status, and distance
   const filteredMesses = useMemo(() => {
     return backendMesses.filter((mess) => {
-      if (maxDistance && mess.distanceKm > maxDistance) return false;
+      if (isNearbyOnly && studentLocation) {
+        // Exclude messes without valid precise coordinates from distance-based results
+        if (!isValidCoordinates(mess.lat, mess.lng)) return false;
+        if (typeof mess.distanceKm === 'number' && mess.distanceKm > nearbyRadiusKm) return false;
+      }
       if (minRating > 0 && mess.rating < minRating) return false;
       if (onlyOpen && !mess.isOpenNow) return false;
       return true;
     });
-  }, [backendMesses, maxDistance, minRating, onlyOpen]);
+  }, [backendMesses, minRating, onlyOpen, isNearbyOnly, studentLocation, nearbyRadiusKm]);
 
   const handleResetFilters = () => {
     setSearchTerm('');
     setSelectedFoodType('all');
     setSelectedLocality('all');
     setMaxPrice(4500);
-    setMaxDistance(3.0);
+    setMaxDistance(5.0);
     setMinRating(0);
     setOnlyOpen(false);
     setSelectedMessId(null);
+    setIsNearbyOnly(false);
+    setStudentLocation(null);
+    setLocationError(null);
   };
 
   const isFilterActive =
@@ -133,9 +280,10 @@ export const FindMessPage: React.FC = () => {
     selectedFoodType !== 'all' ||
     selectedLocality !== 'all' ||
     maxPrice < 4500 ||
-    maxDistance < 3.0 ||
     minRating > 0 ||
-    onlyOpen;
+    onlyOpen ||
+    isNearbyOnly ||
+    studentLocation !== null;
 
   return (
     <div>
@@ -159,6 +307,125 @@ export const FindMessPage: React.FC = () => {
 
       {/* SEARCH BAR & CONTROLS */}
       <div className="card" style={{ padding: '1.25rem', marginBottom: '1.5rem' }}>
+        {/* Student Geolocation Toolbar */}
+        <div
+          style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '10px',
+            marginBottom: '1rem',
+            padding: '10px 14px',
+            background: studentLocation ? '#ecfdf5' : 'var(--bg-card-subtle)',
+            border: `1px solid ${studentLocation ? '#a7f3d0' : 'var(--border-color)'}`,
+            borderRadius: 'var(--radius-md)',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              onClick={handleUseCurrentLocation}
+              disabled={isLocating}
+              className={`btn btn-sm ${studentLocation ? 'btn-success' : 'btn-outline'}`}
+              style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 700 }}
+            >
+              {isLocating ? <RefreshCw size={14} className="spin" /> : <Crosshair size={14} />}
+              {isLocating
+                ? 'Detecting GPS...'
+                : studentLocation
+                ? 'Update My Location'
+                : 'Use My Current Location'}
+            </button>
+
+            {studentLocation && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setIsNearbyOnly(!isNearbyOnly)}
+                  className={`btn btn-sm ${isNearbyOnly ? 'btn-primary' : 'btn-ghost'}`}
+                  style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 700 }}
+                >
+                  <Compass size={14} /> Nearby Messes {isNearbyOnly ? '(Active)' : ''}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleClearLocation}
+                  className="btn btn-ghost btn-sm"
+                  style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}
+                >
+                  <X size={14} /> Clear Location / Show All
+                </button>
+              </>
+            )}
+
+            {studentLocation && (
+              <span style={{ fontSize: '0.78rem', color: '#065f46', fontWeight: 600 }}>
+                📍 GPS Origin: {studentLocation.lat.toFixed(4)}° N, {studentLocation.lng.toFixed(4)}° E
+              </span>
+            )}
+          </div>
+
+          {/* Radius selector when location is active */}
+          {studentLocation && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem' }}>
+              <span style={{ color: 'var(--text-muted)', fontWeight: 600 }}>Radius:</span>
+              <select
+                value={nearbyRadiusKm}
+                onChange={(e) => setNearbyRadiusKm(Number(e.target.value))}
+                style={{
+                  background: '#ffffff',
+                  border: '1px solid var(--border-color)',
+                  borderRadius: 'var(--radius-sm)',
+                  padding: '3px 8px',
+                  fontWeight: 700,
+                  fontSize: '0.8rem',
+                  color: 'var(--text-main)',
+                  cursor: 'pointer',
+                }}
+              >
+                <option value={1.0}>1.0 km</option>
+                <option value={2.0}>2.0 km</option>
+                <option value={3.0}>3.0 km</option>
+                <option value={5.0}>5.0 km (Standard)</option>
+                <option value={10.0}>10.0 km</option>
+                <option value={15.0}>15.0 km</option>
+              </select>
+            </div>
+          )}
+        </div>
+
+        {locationError && (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '8px',
+              background: '#fef2f2',
+              border: '1px solid #fecaca',
+              color: '#991b1b',
+              padding: '8px 12px',
+              borderRadius: '6px',
+              fontSize: '0.82rem',
+              marginBottom: '1rem',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <AlertCircle size={16} />
+              <span>{locationError}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setLocationError(null)}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#991b1b' }}
+            >
+              <X size={14} />
+            </button>
+          </div>
+        )}
+
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', alignItems: 'center' }}>
           {/* Search Input Bar */}
           <div style={{ position: 'relative', flex: '1 1 320px', maxWidth: '560px' }}>
@@ -641,6 +908,7 @@ export const FindMessPage: React.FC = () => {
               selectedMessId={selectedMessId}
               onSelectMess={(id) => setSelectedMessId(id)}
               height="100%"
+              studentPos={studentLocation ? [studentLocation.lat, studentLocation.lng] : null}
             />
           </div>
         </div>
@@ -660,6 +928,7 @@ export const FindMessPage: React.FC = () => {
             selectedMessId={selectedMessId}
             onSelectMess={(id) => setSelectedMessId(id)}
             height="100%"
+            studentPos={studentLocation ? [studentLocation.lat, studentLocation.lng] : null}
           />
         </div>
       )}

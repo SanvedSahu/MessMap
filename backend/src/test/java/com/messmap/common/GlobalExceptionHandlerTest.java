@@ -84,4 +84,33 @@ class GlobalExceptionHandlerTest {
         assertThat(response.getBody()).isNotNull();
         assertThat(response.getBody().getStatus()).isEqualTo(403);
     }
+
+    @Test
+    @DisplayName("MethodArgumentTypeMismatchException should map to HTTP 400 Bad Request")
+    void testMethodArgumentTypeMismatch() {
+        org.springframework.web.method.annotation.MethodArgumentTypeMismatchException ex =
+                new org.springframework.web.method.annotation.MethodArgumentTypeMismatchException(
+                        "MESS-103", Long.class, "id", null, null);
+        request.setRequestURI("/api/messes/MESS-103");
+        ResponseEntity<ErrorResponse> response = exceptionHandler.handleMethodArgumentTypeMismatch(ex, request);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().isSuccess()).isFalse();
+        assertThat(response.getBody().getStatus()).isEqualTo(400);
+        assertThat(response.getBody().getMessage()).contains("Invalid parameter 'id': 'MESS-103' is not a valid Long");
+    }
+
+    @Test
+    @DisplayName("IllegalArgumentException should map to HTTP 400 Bad Request")
+    void testIllegalArgument() {
+        IllegalArgumentException ex = new IllegalArgumentException("Invalid mess argument");
+        ResponseEntity<ErrorResponse> response = exceptionHandler.handleIllegalArgument(ex, request);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().isSuccess()).isFalse();
+        assertThat(response.getBody().getStatus()).isEqualTo(400);
+        assertThat(response.getBody().getMessage()).isEqualTo("Invalid mess argument");
+    }
 }
