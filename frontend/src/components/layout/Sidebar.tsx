@@ -47,58 +47,56 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
 
       <aside className={`app-sidebar ${isOpen ? 'sidebar-open' : ''}`}>
         {/* Brand Header */}
-        <div>
-          <div className="sidebar-brand">
-            <div className="brand-icon-box">🌱</div>
-            <div>
-              <div className="brand-text-title">
-                Mess<span>Map</span>
-                <span className="brand-tag">Student</span>
-              </div>
-              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                Campus Food & Mess Discovery
-              </div>
+        <div className="sidebar-brand">
+          <div className="brand-icon-box">🌱</div>
+          <div>
+            <div className="brand-text-title">
+              Mess<span>Map</span>
+              <span className="brand-tag">Student</span>
             </div>
-
-            <button
-              onClick={onClose}
-              style={{
-                marginLeft: 'auto',
-                display: 'none',
-                padding: '6px',
-                borderRadius: '8px',
-                color: 'var(--text-muted)',
-              }}
-              className="sidebar-mobile-close"
-              aria-label="Close sidebar"
-            >
-              <X size={20} />
-            </button>
+            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+              Campus Food & Mess Discovery
+            </div>
           </div>
 
-          {/* Navigation Links */}
-          <nav className="sidebar-nav">
-            <div className="sidebar-section-title">Menu Navigation</div>
-            {navLinks.map((item) => {
-              const Icon = item.icon;
-              return (
-                <NavLink
-                  key={item.to}
-                  to={item.to}
-                  end={item.to === '/'}
-                  onClick={onClose}
-                  className={({ isActive }) => `nav-item-link ${isActive ? 'active' : ''}`}
-                >
-                  <Icon size={19} />
-                  <span>{item.label}</span>
-                  {item.badge && <span className="nav-badge-pill">{item.badge}</span>}
-                </NavLink>
-              );
-            })}
-          </nav>
+          <button
+            onClick={onClose}
+            style={{
+              marginLeft: 'auto',
+              display: 'none',
+              padding: '6px',
+              borderRadius: '8px',
+              color: 'var(--text-muted)',
+            }}
+            className="sidebar-mobile-close"
+            aria-label="Close sidebar"
+          >
+            <X size={20} />
+          </button>
         </div>
 
-        {/* Bottom Student Profile */}
+        {/* Navigation Links (flex: 1, scrolls independently) */}
+        <nav className="sidebar-nav">
+          <div className="sidebar-section-title">Menu Navigation</div>
+          {navLinks.map((item) => {
+            const Icon = item.icon;
+            return (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                end={item.to === '/'}
+                onClick={onClose}
+                className={({ isActive }) => `nav-item-link ${isActive ? 'active' : ''}`}
+              >
+                <Icon size={19} />
+                <span>{item.label}</span>
+                {item.badge && <span className="nav-badge-pill">{item.badge}</span>}
+              </NavLink>
+            );
+          })}
+        </nav>
+
+        {/* Bottom Student Profile & Anchored Sign Out */}
         <div className="sidebar-bottom">
           {isAuthenticated ? (
             <div>
@@ -114,56 +112,34 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                 </div>
               </Link>
 
-              <div
-                style={{
-                  marginTop: '0.75rem',
-                  paddingTop: '0.75rem',
-                  borderTop: '1px solid var(--border-color)',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
+              <button
+                type="button"
+                onClick={() => {
+                  logout();
+                  navigate('/');
                 }}
+                className="btn btn-outline btn-sm student-signout-btn"
+                style={{
+                  width: '100%',
+                  marginTop: '0.75rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'flex-start',
+                  gap: '0.5rem',
+                  color: 'var(--danger)',
+                  borderColor: 'var(--danger-border)',
+                  padding: '0.45rem 0.75rem',
+                  borderRadius: 'var(--radius-md)',
+                  cursor: 'pointer',
+                  fontSize: '0.8rem',
+                  fontWeight: 600,
+                  background: '#ffffff',
+                }}
+                aria-label="Sign Out of Student Portal"
               >
-                <span
-                  style={{
-                    fontSize: '0.72rem',
-                    color: 'var(--primary-dark)',
-                    fontWeight: 700,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                  }}
-                >
-                  <span
-                    style={{
-                      width: '6px',
-                      height: '6px',
-                      borderRadius: '50%',
-                      background: 'var(--primary)',
-                    }}
-                  />
-                  Signed In
-                </span>
-                <button
-                  onClick={() => {
-                    logout();
-                    navigate('/');
-                  }}
-                  style={{
-                    fontSize: '0.75rem',
-                    color: 'var(--danger)',
-                    fontWeight: 600,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                    background: 'none',
-                    border: 'none',
-                    cursor: 'pointer',
-                  }}
-                >
-                  <LogOut size={13} /> Sign Out
-                </button>
-              </div>
+                <LogOut size={15} />
+                <span>Sign Out</span>
+              </button>
             </div>
           ) : (
             <Link

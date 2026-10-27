@@ -1,5 +1,5 @@
 import React from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard,
   UtensilsCrossed,
@@ -12,8 +12,12 @@ import {
   ChevronRight,
   X,
   CheckCircle2,
-  PhoneCall
+  PhoneCall,
+  AlertCircle,
+  LogOut,
 } from 'lucide-react';
+import { useAuth } from '../../../context/AuthContext';
+import type { OwnerMessProfileResponse } from '../../../api/ownerApi';
 import './Sidebar.css';
 
 interface SidebarProps {
@@ -21,6 +25,8 @@ interface SidebarProps {
   setIsCollapsed: (collapsed: boolean) => void;
   isMobileOpen: boolean;
   setIsMobileOpen: (open: boolean) => void;
+  mess?: OwnerMessProfileResponse | null;
+  isOpenStatus?: boolean;
 }
 
 interface NavItem {
@@ -44,8 +50,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
   setIsCollapsed,
   isMobileOpen,
   setIsMobileOpen,
+  mess,
+  isOpenStatus = true,
 }) => {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { user, logout } = useAuth();
+  const isDemoOwner = user.email === 'rajesh.sharma@annapurnamess.com' || user.messId === 'MESS-101';
+  const hasMess = !!mess || !!user.messId || isDemoOwner;
+
+  const displayTitle = mess?.name || user.messName || (isDemoOwner ? 'Annapurna Deluxe Mess' : 'My Mess');
+  const displayAddress = mess?.address
+    ? `${mess.address}${mess.area ? `, ${mess.area}` : ''}`
+    : (isDemoOwner ? 'Katraj Kondhwa Rd, Pune' : 'Pune, Maharashtra');
+  const displayPhone = mess?.phone || user.phone || (isDemoOwner ? '+91 98231 44550' : 'Contact not set');
+  const displayStatus = mess?.status === 'APPROVED' ? 'Verified' : (mess?.status || (isDemoOwner ? 'Verified' : 'Pending'));
 
   const handleLinkClick = () => {
     if (isMobileOpen) {
@@ -128,25 +147,66 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* Sidebar Footer with Mess Status Card */}
         <div className="sidebar-footer">
           {!isCollapsed ? (
-            <div className="mess-status-card">
-              <div className="mess-status-top">
-                <div className="mess-status-indicator">
-                  <span className="pulsing-dot"></span>
-                  <span className="status-text">Open Today</span>
+            <>
+              {hasMess ? (
+                <div className="mess-status-card">
+                  <div className="mess-status-top">
+                    <div className="mess-status-indicator">
+                      <span className="pulsing-dot"></span>
+                      <span className="status-text">{isOpenStatus ? 'Open Today' : 'Closed'}</span>
+                    </div>
+                    <span className="verified-pill">
+                      <CheckCircle2 size={12} /> {displayStatus}
+                    </span>
+                  </div>
+                  <h4 className="mess-title">{displayTitle}</h4>
+                  <p className="mess-address">{displayAddress}</p>
+                  <div className="mess-quick-phone">
+                    <PhoneCall size={12} /> {displayPhone}
+                  </div>
                 </div>
-                <span className="verified-pill">
-                  <CheckCircle2 size={12} /> Verified
-                </span>
-              </div>
-              <h4 className="mess-title">Annapurna Deluxe Mess</h4>
-              <p className="mess-address">Katraj Kondhwa Rd, Pune</p>
-              <div className="mess-quick-phone">
-                <PhoneCall size={12} /> +91 98231 44550
-              </div>
-            </div>
+              ) : (
+                <div className="mess-status-card">
+                  <div className="mess-status-top">
+                    <div className="mess-status-indicator">
+                      <span className="status-text" style={{ color: 'var(--text-muted)' }}>Setup Required</span>
+                    </div>
+                  </div>
+                  <h4 className="mess-title" style={{ fontSize: '0.9rem' }}>No Mess Profile</h4>
+                  <p className="mess-address">Configure your mess profile</p>
+                </div>
+              )}
+
+              <button
+                type="button"
+                onClick={() => {
+                  logout();
+                  navigate('/');
+                }}
+                className="owner-signout-btn"
+                aria-label="Sign Out of Mess Owner Portal"
+              >
+                <LogOut size={15} />
+                <span>Sign Out</span>
+              </button>
+            </>
           ) : (
-            <div className="collapsed-indicator" title="Annapurna Mess - Open">
-              <span className="pulsing-dot"></span>
+            <div className="collapsed-footer-actions">
+              <div className="collapsed-indicator" title={`${displayTitle} - ${isOpenStatus ? 'Open' : 'Closed'}`}>
+                <span className="pulsing-dot"></span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  logout();
+                  navigate('/');
+                }}
+                className="owner-signout-btn-collapsed"
+                title="Sign Out"
+                aria-label="Sign Out of Mess Owner Portal"
+              >
+                <LogOut size={16} />
+              </button>
             </div>
           )}
 

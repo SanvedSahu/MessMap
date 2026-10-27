@@ -323,6 +323,59 @@
   border-color: var(--green-200);
 }
 
+/* Owner Anchored Sign Out Button */
+.owner-signout-btn {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: var(--radius-md);
+  background-color: #ffffff;
+  border: 1px solid var(--danger-border, #fecaca);
+  color: var(--danger, #ef4444);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  text-align: left;
+}
+
+.owner-signout-btn:hover {
+  background-color: #fef2f2;
+  border-color: #fca5a5;
+  color: #dc2626;
+}
+
+.collapsed-footer-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+}
+
+.owner-signout-btn-collapsed {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: var(--radius-md);
+  background-color: #ffffff;
+  border: 1px solid var(--danger-border, #fecaca);
+  color: var(--danger, #ef4444);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.owner-signout-btn-collapsed:hover {
+  background-color: #fef2f2;
+  border-color: #fca5a5;
+  color: #dc2626;
+}
+
 /* Mobile Overlay Backdrop */
 .sidebar-backdrop {
   position: fixed;

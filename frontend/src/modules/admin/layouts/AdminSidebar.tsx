@@ -324,8 +324,29 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
               </button>
             </div>
           ) : (
-            <div style={{ display: 'flex', justifyContent: 'center' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem' }}>
               <span className="status-dot active" title="System Online" />
+              <button
+                onClick={() => {
+                  logout();
+                  navigate('/');
+                }}
+                className="btn btn-outline btn-sm"
+                style={{
+                  width: '36px',
+                  height: '36px',
+                  padding: 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: 'var(--danger)',
+                  borderColor: 'var(--danger-border)',
+                }}
+                title="Sign Out of Admin"
+                aria-label="Sign Out of Admin"
+              >
+                <LogOut size={16} />
+              </button>
             </div>
           )}
         </div>
