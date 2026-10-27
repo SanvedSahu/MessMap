@@ -171,7 +171,7 @@ export const StudentDashboardPage: React.FC = () => {
               marginBottom: '0.85rem',
             }}
           >
-            <Sparkles size={14} /> Student Discovery Dashboard • Pune Campus
+            <Sparkles size={14} /> Student Discovery Dashboard
           </div>
 
           <h1

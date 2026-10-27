@@ -12,6 +12,7 @@ import {
   Award,
   RefreshCw,
   UtensilsCrossed,
+  HelpCircle,
 } from 'lucide-react';
 import {
   getMessByIdApi,
@@ -20,6 +21,7 @@ import {
   MenuItemDto,
   ReviewApiResponse,
 } from '../../../api/studentApi';
+import { AskEnquiryModal } from '../../../components/enquiry/AskEnquiryModal';
 import { FoodBadge, StatusBadge } from '../../../components/ui/Badge';
 import { MessMapView } from '../components/MessMapView';
 import { useFavorites } from '../../../context/FavoritesContext';
@@ -41,6 +43,7 @@ export const MessDetailsPage: React.FC = () => {
   const [activePhoto, setActivePhoto] = useState<string>('');
   const [activeTab, setActiveTab] = useState<'menu' | 'plans' | 'timings' | 'reviews'>('menu');
   const [refreshTrigger, setRefreshTrigger] = useState<number>(0);
+  const [isEnquiryModalOpen, setIsEnquiryModalOpen] = useState<boolean>(false);
 
   const favorited = mess ? isFavorite(mess.id) : false;
 
@@ -244,6 +247,15 @@ export const MessDetailsPage: React.FC = () => {
         </button>
 
         <div style={{ display: 'flex', gap: '8px' }}>
+          <button
+            type="button"
+            onClick={() => setIsEnquiryModalOpen(true)}
+            className="btn btn-primary btn-sm"
+            style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+            title="Ask an enquiry about this mess"
+          >
+            <HelpCircle size={15} /> Ask Enquiry
+          </button>
           <button
             type="button"
             onClick={handleShare}
@@ -1007,6 +1019,20 @@ export const MessDetailsPage: React.FC = () => {
               >
                 <MessageCircle size={18} /> Chat on WhatsApp
               </a>
+              <button
+                type="button"
+                onClick={() => setIsEnquiryModalOpen(true)}
+                className="btn btn-outline"
+                style={{
+                  width: '100%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                }}
+              >
+                <HelpCircle size={18} /> Send Enquiry to Mess
+              </button>
             </div>
 
             <div
@@ -1088,6 +1114,15 @@ export const MessDetailsPage: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {mess && (
+        <AskEnquiryModal
+          isOpen={isEnquiryModalOpen}
+          onClose={() => setIsEnquiryModalOpen(false)}
+          messId={mess.id}
+          messName={mess.name}
+        />
+      )}
     </div>
   );
 };

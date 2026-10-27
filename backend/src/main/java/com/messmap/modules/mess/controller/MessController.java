@@ -6,6 +6,9 @@ import com.messmap.modules.mess.dto.MessDetailResponse;
 import com.messmap.modules.mess.dto.MessFilterRequest;
 import com.messmap.modules.mess.dto.MessSummaryResponse;
 import com.messmap.modules.mess.service.MessDiscoveryService;
+import com.messmap.modules.menu.dto.DailyMealResponse;
+import com.messmap.modules.menu.dto.WeeklyMenuResponse;
+import com.messmap.modules.menu.service.OwnerMenuService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -27,6 +30,7 @@ import java.util.List;
 public class MessController {
 
     private final MessDiscoveryService messDiscoveryService;
+    private final OwnerMenuService ownerMenuService;
 
     /**
      * Search and discover approved messes with optional multi-criteria filters.
@@ -152,5 +156,37 @@ public class MessController {
         log.info("GET /api/messes/{}", id);
         MessDetailResponse messDetails = messDiscoveryService.getApprovedMessDetails(id);
         return ResponseEntity.ok(ApiResponse.success("Mess details retrieved successfully", messDetails));
+    }
+
+    /**
+     * Retrieve daily meal menu for a specific approved mess.
+     * Accessible via GET /api/messes/{id}/daily-menu and GET /api/v1/messes/{id}/daily-menu.
+     *
+     * @param id  Mess primary key
+     * @param day Optional day of week (MONDAY..SUNDAY), defaults to today or MONDAY
+     * @return DailyMealResponse with breakfast, lunch, and dinner
+     */
+    @GetMapping({"/api/messes/{id}/daily-menu", "/api/v1/messes/{id}/daily-menu"})
+    public ResponseEntity<ApiResponse<DailyMealResponse>> getMessDailyMenu(
+            @PathVariable("id") Long id,
+            @RequestParam(name = "day", required = false) String day
+    ) {
+        log.info("GET /api/messes/{}/daily-menu?day={}", id, day);
+        DailyMealResponse response = ownerMenuService.getMessDailyMenu(id, day);
+        return ResponseEntity.ok(ApiResponse.success("Daily menu retrieved successfully", response));
+    }
+
+    /**
+     * Retrieve 7-day weekly menu schedule for a specific approved mess.
+     * Accessible via GET /api/messes/{id}/weekly-menu and GET /api/v1/messes/{id}/weekly-menu.
+     *
+     * @param id Mess primary key
+     * @return WeeklyMenuResponse with all 7 days
+     */
+    @GetMapping({"/api/messes/{id}/weekly-menu", "/api/v1/messes/{id}/weekly-menu"})
+    public ResponseEntity<ApiResponse<WeeklyMenuResponse>> getMessWeeklyMenu(@PathVariable("id") Long id) {
+        log.info("GET /api/messes/{}/weekly-menu", id);
+        WeeklyMenuResponse response = ownerMenuService.getMessWeeklyMenu(id);
+        return ResponseEntity.ok(ApiResponse.success("Weekly menu retrieved successfully", response));
     }
 }

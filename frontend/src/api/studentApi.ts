@@ -813,4 +813,137 @@ export function adaptFavoriteToMessItem(fav: FavoriteApiResponse): MessItem {
   };
 }
 
+// -----------------------------------------------------------------------------
+// Issue: Student Enquiries APIs
+// -----------------------------------------------------------------------------
+
+export interface CreateEnquiryPayload {
+  messId: number;
+  category: string;
+  message: string;
+  planPreference?: string;
+  contactPhone?: string;
+}
+
+export interface StudentEnquiryResponse {
+  id: number;
+  messId: number;
+  messName: string;
+  studentId: number;
+  studentName: string;
+  studentEmail: string;
+  studentPhone?: string;
+  studentCollege?: string;
+  category: string;
+  message: string;
+  planPreference?: string;
+  status: 'NEW' | 'REPLIED';
+  replyNotes?: string;
+  repliedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * Submit an authenticated student customer enquiry about a specific mess.
+ * Route: POST /api/student/enquiries
+ */
+export async function createStudentEnquiryApi(
+  payload: CreateEnquiryPayload,
+  token: string
+): Promise<StandardApiResponse<StudentEnquiryResponse>> {
+  const response = await fetch(`${API_BASE_URL}/student/enquiries`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.message || 'Failed to submit enquiry.');
+  }
+  return data;
+}
+
+/**
+ * Retrieve all enquiries submitted by the authenticated student.
+ * Route: GET /api/student/enquiries
+ */
+export async function getStudentEnquiriesApi(
+  token: string
+): Promise<StandardApiResponse<StudentEnquiryResponse[]>> {
+  const response = await fetch(`${API_BASE_URL}/student/enquiries`, {
+    method: 'GET',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.message || 'Failed to fetch student enquiries.');
+  }
+  return data;
+}
+
+// -----------------------------------------------------------------------------
+// Issue: Daily & Weekly Menu Discovery APIs
+// -----------------------------------------------------------------------------
+
+export interface DailyMealResponse {
+  messId: number;
+  messName: string;
+  dayOfWeek: string;
+  breakfast?: string;
+  lunch?: string;
+  dinner?: string;
+  breakfastItems?: any[];
+  lunchItems?: any[];
+  dinnerItems?: any[];
+  meals?: Record<string, any[]>;
+}
+
+export interface WeeklyMenuResponse {
+  messId: number;
+  messName: string;
+  weeklySchedule: DailyMealResponse[];
+  scheduleByDay: Record<string, DailyMealResponse>;
+}
+
+/**
+ * Retrieve the daily meal menu for a mess for a specific day.
+ * Route: GET /api/messes/{id}/daily-menu?day={day}
+ */
+export async function getMessDailyMenuApi(
+  messId: number | string,
+  day?: string
+): Promise<StandardApiResponse<DailyMealResponse>> {
+  const query = day ? `?day=${encodeURIComponent(day)}` : '';
+  const response = await fetch(`${API_BASE_URL}/messes/${messId}/daily-menu${query}`);
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.message || 'Failed to fetch mess daily menu.');
+  }
+  return data;
+}
+
+/**
+ * Retrieve the full 7-day weekly menu schedule for a mess.
+ * Route: GET /api/messes/{id}/weekly-menu
+ */
+export async function getMessWeeklyMenuApi(
+  messId: number | string
+): Promise<StandardApiResponse<WeeklyMenuResponse>> {
+  const response = await fetch(`${API_BASE_URL}/messes/${messId}/weekly-menu`);
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.message || 'Failed to fetch mess weekly menu.');
+  }
+  return data;
+}
+
 

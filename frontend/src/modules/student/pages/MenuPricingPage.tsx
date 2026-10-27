@@ -10,9 +10,17 @@ import {
   Loader2,
   AlertCircle,
   RefreshCw,
+  HelpCircle,
+  UtensilsCrossed,
 } from 'lucide-react';
 import { MessItem } from '../../../types/student.types';
-import { getMessesApi, adaptMessSummaryToMessItem } from '../../../api/studentApi';
+import {
+  getMessesApi,
+  adaptMessSummaryToMessItem,
+  getMessDailyMenuApi,
+  DailyMealResponse,
+} from '../../../api/studentApi';
+import { AskEnquiryModal } from '../../../components/enquiry/AskEnquiryModal';
 
 export const MenuPricingPage: React.FC = () => {
   const [selectedDay, setSelectedDay] = useState<string>('Today');
@@ -20,6 +28,12 @@ export const MenuPricingPage: React.FC = () => {
   const [messes, setMesses] = useState<MessItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Daily Meal Menu dynamic database state
+  const [dailyMenu, setDailyMenu] = useState<DailyMealResponse | null>(null);
+  const [dailyMenuLoading, setDailyMenuLoading] = useState<boolean>(false);
+  const [dailyMenuError, setDailyMenuError] = useState<string | null>(null);
+  const [isEnquiryModalOpen, setIsEnquiryModalOpen] = useState<boolean>(false);
 
   // Interactive Student Calculator State
   const [calcMealsPerDay, setCalcMealsPerDay] = useState<number>(2);
@@ -80,57 +94,46 @@ export const MenuPricingPage: React.FC = () => {
     'Sunday',
   ];
 
-  const weeklySchedule: Record<string, { breakfast: string; lunch: string; dinner: string }> = {
-    Monday: {
-      breakfast: 'Poha with Roasted Peanuts & Masala Chai',
-      lunch: 'Paneer Bhurji, Dal Tadka, Steamed Rice, 4 Phulkas, Salad',
-      dinner: 'Aloo Gobi Matar, Moong Dal Fry, Kolam Rice, Phulkas',
-    },
-    Tuesday: {
-      breakfast: 'Upma with Coconut Chutney & Filter Coffee',
-      lunch: 'Chole Masala, Mix Veg Sabji, Dal Fry, Jeera Rice, Phulkas, Boondi Raita',
-      dinner: 'Baingan Masala, Yellow Dal, Steamed Rice, Chapati',
-    },
-    Wednesday: {
-      breakfast: 'Idli Sambar with Podi & Tea',
-      lunch: 'Paneer Makhani (or Chicken Sukka for non-veg), Dal Makhani, Fried Rice, Phulkas',
-      dinner: 'Matki Usal (Sprouts), Varan Bhaat with Ghee, Phulkas, Papad',
-    },
-    Thursday: {
-      breakfast: 'Methi Paratha with Curd & Pickle',
-      lunch: 'Rajma Rasila, Aloo Jeera Sukha, Dal Fry, Steamed Rice, Phulkas, Salad',
-      dinner: 'Lauki Chana Dal, Tomato Rasam, Rice, Phulkas',
-    },
-    Friday: {
-      breakfast: 'Kanda Poha & Boiled Egg / Sprouts',
-      lunch: 'Dal Makhani Slow-cooked, Shahi Paneer, Jeera Rice, Hot Phulkas, Kheer',
-      dinner: 'Egg Curry / Shev Bhaji, Dal Tadka, Rice, Chapati',
-    },
-    Saturday: {
-      breakfast: 'Sabudana Khichdi with Curd & Peanut Chutney',
-      lunch: 'Kadhi Pakora, Aloo Shimlamirch, Steamed Rice, Phulkas, Papad',
-      dinner: 'Mix Veg Kolhapuri, Dal Fry, Khichdi, Phulkas',
-    },
-    Sunday: {
-      breakfast: 'Misal Pav with Farsan & Lemon',
-      lunch: '🌟 SUNDAY FEAST: Shrikhand / Gulab Jamun, Puri, Chana Masala, Pulao, Dal',
-      dinner: 'Light Khichdi / Veg Biryani with Boondi Raita',
-    },
-  };
+  // Dynamic daily menu fetch connected to database
+  useEffect(() => {
+    if (!selectedMess?.id) return;
+    let isCurrent = true;
+    setDailyMenuLoading(true);
+    setDailyMenuError(null);
 
-  const currentMenu =
-    selectedDay === 'Today'
-      ? {
-          breakfast:
-            (selectedMess as any)?.todayMenu?.breakfast?.dish || 'Poha with roasted peanuts & tea',
-          lunch: (selectedMess as any)?.todayMenu?.lunch?.sabji1
-            ? `${(selectedMess as any).todayMenu.lunch.sabji1}, ${(selectedMess as any).todayMenu.lunch.sabji2}, ${(selectedMess as any).todayMenu.lunch.dal}, ${(selectedMess as any).todayMenu.lunch.bread}`
-            : 'Paneer Bhurji, Dal Tadka, Steamed Rice, 4 Phulkas, Salad',
-          dinner: (selectedMess as any)?.todayMenu?.dinner?.sabji1
-            ? `${(selectedMess as any).todayMenu.dinner.sabji1}, ${(selectedMess as any).todayMenu.dinner.sabji2}, ${(selectedMess as any).todayMenu.dinner.dal}, ${(selectedMess as any).todayMenu.dinner.bread}`
-            : 'Aloo Gobi Matar, Moong Dal Fry, Kolam Rice, Phulkas',
+    const dayOfWeekNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const todayName = dayOfWeekNames[new Date().getDay()];
+    const queryDay = selectedDay === 'Today' ? todayName : selectedDay;
+
+    getMessDailyMenuApi(selectedMess.id, queryDay)
+      .then((res) => {
+        if (!isCurrent) return;
+        if (res?.data) {
+          setDailyMenu(res.data);
+        } else {
+          setDailyMenu(null);
         }
-      : weeklySchedule[selectedDay];
+      })
+      .catch((err) => {
+        if (!isCurrent) return;
+        console.warn(`[MenuPricingPage] Failed to fetch daily menu for mess ${selectedMess.id}, day ${queryDay}:`, err);
+        setDailyMenuError('Menu not updated yet for this day.');
+        setDailyMenu(null);
+      })
+      .finally(() => {
+        if (isCurrent) setDailyMenuLoading(false);
+      });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [selectedMess?.id, selectedDay]);
+
+  const currentMenu = {
+    breakfast: dailyMenu?.breakfast?.trim() || null,
+    lunch: dailyMenu?.lunch?.trim() || null,
+    dinner: dailyMenu?.dinner?.trim() || null,
+  };
 
   if (loading) {
     return (
@@ -294,23 +297,45 @@ export const MenuPricingPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Mess Selector dropdown */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)' }}>
-              Viewing Mess:
-            </span>
-            <select
-              className="form-select"
-              value={selectedMessId}
-              onChange={(e) => setSelectedMessId(e.target.value)}
-              style={{ width: 'auto', padding: '0.45rem 0.85rem', fontWeight: 700 }}
-            >
-              {messes.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.name} ({m.foodType})
-                </option>
-              ))}
-            </select>
+          {/* Mess Selector dropdown & Quick Actions */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)' }}>
+                Viewing Mess:
+              </span>
+              <select
+                className="form-select"
+                value={selectedMessId}
+                onChange={(e) => setSelectedMessId(e.target.value)}
+                style={{ width: 'auto', padding: '0.45rem 0.85rem', fontWeight: 700 }}
+              >
+                {messes.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.name} ({m.foodType})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {selectedMess && (
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm"
+                  onClick={() => setIsEnquiryModalOpen(true)}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                >
+                  <HelpCircle size={15} /> Ask Enquiry
+                </button>
+                <Link
+                  to={`/mess/${selectedMess.id}`}
+                  className="btn btn-outline btn-sm"
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                >
+                  View Details →
+                </Link>
+              </div>
+            )}
           </div>
         </div>
 
@@ -380,16 +405,35 @@ export const MenuPricingPage: React.FC = () => {
               <Coffee size={18} />
               <span>BREAKFAST (07:30 – 10:00 AM)</span>
             </div>
-            <p
-              style={{
-                fontSize: '0.9rem',
-                color: 'var(--text-main)',
-                lineHeight: 1.5,
-                fontWeight: 500,
-              }}
-            >
-              {currentMenu.breakfast}
-            </p>
+            {dailyMenuLoading ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-muted)', fontSize: '0.88rem' }}>
+                <Loader2 size={16} className="animate-spin" />
+                <span>Loading breakfast menu...</span>
+              </div>
+            ) : currentMenu.breakfast ? (
+              <p
+                style={{
+                  fontSize: '0.9rem',
+                  color: 'var(--text-main)',
+                  lineHeight: 1.5,
+                  fontWeight: 500,
+                  margin: 0,
+                }}
+              >
+                {currentMenu.breakfast}
+              </p>
+            ) : (
+              <p
+                style={{
+                  fontSize: '0.9rem',
+                  color: 'var(--text-muted)',
+                  fontStyle: 'italic',
+                  margin: 0,
+                }}
+              >
+                Menu not updated yet
+              </p>
+            )}
           </div>
 
           {/* Lunch */}
@@ -414,16 +458,35 @@ export const MenuPricingPage: React.FC = () => {
               <Sun size={18} />
               <span>LUNCH (12:15 – 03:00 PM)</span>
             </div>
-            <p
-              style={{
-                fontSize: '0.9rem',
-                color: 'var(--text-main)',
-                lineHeight: 1.5,
-                fontWeight: 500,
-              }}
-            >
-              {currentMenu.lunch}
-            </p>
+            {dailyMenuLoading ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-muted)', fontSize: '0.88rem' }}>
+                <Loader2 size={16} className="animate-spin" />
+                <span>Loading lunch menu...</span>
+              </div>
+            ) : currentMenu.lunch ? (
+              <p
+                style={{
+                  fontSize: '0.9rem',
+                  color: 'var(--text-main)',
+                  lineHeight: 1.5,
+                  fontWeight: 500,
+                  margin: 0,
+                }}
+              >
+                {currentMenu.lunch}
+              </p>
+            ) : (
+              <p
+                style={{
+                  fontSize: '0.9rem',
+                  color: 'var(--text-muted)',
+                  fontStyle: 'italic',
+                  margin: 0,
+                }}
+              >
+                Menu not updated yet
+              </p>
+            )}
           </div>
 
           {/* Dinner */}
@@ -448,306 +511,35 @@ export const MenuPricingPage: React.FC = () => {
               <Moon size={18} />
               <span>DINNER (07:30 – 10:15 PM)</span>
             </div>
-            <p
-              style={{
-                fontSize: '0.9rem',
-                color: 'var(--text-main)',
-                lineHeight: 1.5,
-                fontWeight: 500,
-              }}
-            >
-              {currentMenu.dinner}
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* SECTION 2: PLANS COMPARISON MATRIX */}
-      <div style={{ marginBottom: '3rem' }}>
-        <h2
-          style={{
-            fontSize: '1.5rem',
-            fontWeight: 800,
-            marginBottom: '0.4rem',
-            color: 'var(--text-main)',
-          }}
-        >
-          Subscription Plan Comparison
-        </h2>
-        <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '1.5rem' }}>
-          Pick the package that matches your college schedule and budget.
-        </p>
-
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-            gap: '1.25rem',
-          }}
-        >
-          {/* Plan 1 */}
-          <div className="card" style={{ display: 'flex', flexDirection: 'column' }}>
-            <div
-              style={{
-                fontSize: '0.75rem',
-                color: 'var(--text-muted)',
-                fontWeight: 700,
-                textTransform: 'uppercase',
-              }}
-            >
-              Trial / Ad-hoc
-            </div>
-            <h3
-              style={{
-                fontSize: '1.2rem',
-                fontWeight: 800,
-                margin: '4px 0 8px 0',
-                color: 'var(--text-main)',
-              }}
-            >
-              Single Meal Token
-            </h3>
-            <div
-              style={{
-                fontSize: '1.8rem',
-                fontWeight: 800,
-                color: 'var(--text-main)',
-                marginBottom: '1rem',
-              }}
-            >
-              ₹85 – ₹110{' '}
-              <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 500 }}>
-                / thali
-              </span>
-            </div>
-            <ul
-              style={{
-                listStyle: 'none',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '8px',
-                fontSize: '0.82rem',
-                color: 'var(--text-secondary)',
-                marginBottom: '1.5rem',
-              }}
-            >
-              <li>✓ Instant single meal thali</li>
-              <li>✓ Unlimited hot phulkas & dal</li>
-              <li>✓ No advance commitment</li>
-              <li>✓ Walk-in and dine directly</li>
-              <li>✗ No Sunday sweet included</li>
-            </ul>
-            <Link
-              to={`/mess/${selectedMess.id}`}
-              className="btn btn-outline btn-sm"
-              style={{ marginTop: 'auto' }}
-            >
-              View Mess & Contact →
-            </Link>
-          </div>
-
-          {/* Plan 2: 15-Day Flexi */}
-          <div className="card" style={{ display: 'flex', flexDirection: 'column' }}>
-            <div
-              style={{
-                fontSize: '0.75rem',
-                color: '#0284c7',
-                fontWeight: 700,
-                textTransform: 'uppercase',
-              }}
-            >
-              Exam Special
-            </div>
-            <h3
-              style={{
-                fontSize: '1.2rem',
-                fontWeight: 800,
-                margin: '4px 0 8px 0',
-                color: 'var(--text-main)',
-              }}
-            >
-              15-Day Flexi Plan
-            </h3>
-            <div
-              style={{
-                fontSize: '1.8rem',
-                fontWeight: 800,
-                color: 'var(--text-main)',
-                marginBottom: '1rem',
-              }}
-            >
-              ₹1,750{' '}
-              <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 500 }}>
-                / 15 days
-              </span>
-            </div>
-            <ul
-              style={{
-                listStyle: 'none',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '8px',
-                fontSize: '0.82rem',
-                color: 'var(--text-secondary)',
-                marginBottom: '1.5rem',
-              }}
-            >
-              <li>✓ 30 Meals (Lunch + Dinner)</li>
-              <li>✓ Unlimited chapatis</li>
-              <li>✓ 2 Days meal pause allowed</li>
-              <li>✓ Ideal for semester exam weeks</li>
-            </ul>
-            <Link
-              to={`/mess/${selectedMess.id}`}
-              className="btn btn-outline btn-sm"
-              style={{ marginTop: 'auto' }}
-            >
-              View Mess & Contact →
-            </Link>
-          </div>
-
-          {/* Plan 3: Monthly Standard (Popular) */}
-          <div
-            className="card"
-            style={{
-              display: 'flex',
-              flexDirection: 'column',
-              border: '2px solid var(--primary)',
-              position: 'relative',
-            }}
-          >
-            <div
-              style={{
-                position: 'absolute',
-                top: '-11px',
-                right: '16px',
-                background: 'var(--primary)',
-                color: 'white',
-                padding: '2px 10px',
-                borderRadius: 'var(--radius-full)',
-                fontSize: '0.7rem',
-                fontWeight: 800,
-              }}
-            >
-              STUDENT CHOICE
-            </div>
-            <div
-              style={{
-                fontSize: '0.75rem',
-                color: 'var(--primary-dark)',
-                fontWeight: 700,
-                textTransform: 'uppercase',
-              }}
-            >
-              Full Month (2 Meals)
-            </div>
-            <h3
-              style={{
-                fontSize: '1.2rem',
-                fontWeight: 800,
-                margin: '4px 0 8px 0',
-                color: 'var(--text-main)',
-              }}
-            >
-              Monthly Standard
-            </h3>
-            <div
-              style={{
-                fontSize: '1.8rem',
-                fontWeight: 800,
-                color: 'var(--primary-dark)',
-                marginBottom: '1rem',
-              }}
-            >
-              ₹3,200{' '}
-              <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 500 }}>
-                / month
-              </span>
-            </div>
-            <ul
-              style={{
-                listStyle: 'none',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '8px',
-                fontSize: '0.82rem',
-                color: 'var(--text-secondary)',
-                marginBottom: '1.5rem',
-              }}
-            >
-              <li>✓ 60 Meals (Lunch & Dinner daily)</li>
-              <li>✓ Unlimited phulkas & rice</li>
-              <li>✓ Free Sunday Sweet Feast included</li>
-              <li>✓ Up to 6 Days Meal Pause with validity extension</li>
-              <li>✓ Reliable monthly dining near campus</li>
-            </ul>
-            <Link
-              to={`/mess/${selectedMess.id}`}
-              className="btn btn-primary btn-sm"
-              style={{ marginTop: 'auto' }}
-            >
-              View Mess & Contact →
-            </Link>
-          </div>
-
-          {/* Plan 4: Complete */}
-          <div className="card" style={{ display: 'flex', flexDirection: 'column' }}>
-            <div
-              style={{
-                fontSize: '0.75rem',
-                color: 'var(--primary-dark)',
-                fontWeight: 700,
-                textTransform: 'uppercase',
-              }}
-            >
-              All 3 Meals
-            </div>
-            <h3
-              style={{
-                fontSize: '1.2rem',
-                fontWeight: 800,
-                margin: '4px 0 8px 0',
-                color: 'var(--text-main)',
-              }}
-            >
-              Monthly Complete
-            </h3>
-            <div
-              style={{
-                fontSize: '1.8rem',
-                fontWeight: 800,
-                color: 'var(--text-main)',
-                marginBottom: '1rem',
-              }}
-            >
-              ₹4,100{' '}
-              <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 500 }}>
-                / month
-              </span>
-            </div>
-            <ul
-              style={{
-                listStyle: 'none',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '8px',
-                fontSize: '0.82rem',
-                color: 'var(--text-secondary)',
-                marginBottom: '1.5rem',
-              }}
-            >
-              <li>✓ Breakfast + Lunch + Dinner (90 Meals)</li>
-              <li>✓ Morning Special Tea / Coffee</li>
-              <li>✓ Priority counter access</li>
-              <li>✓ Free hostel tiffin delivery</li>
-            </ul>
-            <Link
-              to={`/mess/${selectedMess.id}`}
-              className="btn btn-outline btn-sm"
-              style={{ marginTop: 'auto' }}
-            >
-              View Mess & Contact →
-            </Link>
+            {dailyMenuLoading ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-muted)', fontSize: '0.88rem' }}>
+                <Loader2 size={16} className="animate-spin" />
+                <span>Loading dinner menu...</span>
+              </div>
+            ) : currentMenu.dinner ? (
+              <p
+                style={{
+                  fontSize: '0.9rem',
+                  color: 'var(--text-main)',
+                  lineHeight: 1.5,
+                  fontWeight: 500,
+                  margin: 0,
+                }}
+              >
+                {currentMenu.dinner}
+              </p>
+            ) : (
+              <p
+                style={{
+                  fontSize: '0.9rem',
+                  color: 'var(--text-muted)',
+                  fontStyle: 'italic',
+                  margin: 0,
+                }}
+              >
+                Menu not updated yet
+              </p>
+            )}
           </div>
         </div>
       </div>
@@ -926,6 +718,15 @@ export const MenuPricingPage: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {selectedMess && (
+        <AskEnquiryModal
+          isOpen={isEnquiryModalOpen}
+          onClose={() => setIsEnquiryModalOpen(false)}
+          messId={selectedMess.id}
+          messName={selectedMess.name}
+        />
+      )}
     </div>
   );
 };

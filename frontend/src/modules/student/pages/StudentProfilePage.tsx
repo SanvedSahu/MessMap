@@ -6,10 +6,16 @@ import {
   Save,
   Key,
   RefreshCw,
+  MessageSquare,
+  CheckCircle2,
+  Clock,
+  Building,
 } from 'lucide-react';
 import {
   getStudentProfileApi,
   updateStudentProfileApi,
+  getStudentEnquiriesApi,
+  StudentEnquiryResponse,
   DietaryPreference,
 } from '../../../api/studentApi';
 import { useAuth } from '../../../context/AuthContext';
@@ -39,6 +45,27 @@ export const StudentProfilePage: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   const [passwords, setPasswords] = useState({ current: '', newPass: '', confirm: '' });
+
+  // Enquiries submitted by student
+  const [enquiries, setEnquiries] = useState<StudentEnquiryResponse[]>([]);
+  const [loadingEnquiries, setLoadingEnquiries] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (!token) return;
+    setLoadingEnquiries(true);
+    getStudentEnquiriesApi(token)
+      .then((res) => {
+        if (res?.data) {
+          setEnquiries(res.data);
+        }
+      })
+      .catch((err) => {
+        console.warn('Failed to load student enquiries:', err);
+      })
+      .finally(() => {
+        setLoadingEnquiries(false);
+      });
+  }, [token]);
 
   // Load authenticated student's real profile from GET /api/student/profile
   useEffect(() => {
@@ -433,6 +460,74 @@ export const StudentProfilePage: React.FC = () => {
             Sign Out
           </button>
         </div>
+      </div>
+
+      {/* MY SUBMITTED MESS ENQUIRIES */}
+      <div className="card" style={{ padding: '1.5rem', marginBottom: '2rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '1.25rem' }}>
+          <MessageSquare size={20} color="var(--primary)" />
+          <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-main)', margin: 0 }}>
+            My Mess Enquiries ({enquiries.length})
+          </h3>
+        </div>
+
+        {loadingEnquiries ? (
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Loading your submitted enquiries...</p>
+        ) : enquiries.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '2rem 1rem', background: 'var(--bg-app)', borderRadius: 'var(--radius-md)' }}>
+            <MessageSquare size={36} color="var(--text-muted)" style={{ margin: '0 auto 0.5rem' }} />
+            <h4 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-main)', marginBottom: '0.25rem' }}>No enquiries submitted yet</h4>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', margin: 0 }}>
+              When you ask a question or enquire about monthly meal passes from any mess page, your enquiry and the owner's response will show here.
+            </p>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            {enquiries.map((enq) => (
+              <div
+                key={enq.id}
+                style={{
+                  padding: '1rem',
+                  borderRadius: 'var(--radius-md)',
+                  border: '1px solid var(--border-color)',
+                  backgroundColor: 'var(--bg-app)',
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px', flexWrap: 'wrap', gap: '6px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Building size={16} color="var(--primary)" />
+                    <strong style={{ fontSize: '0.95rem', color: 'var(--text-main)' }}>{enq.messName}</strong>
+                    <span style={{ fontSize: '0.75rem', background: 'var(--primary-light)', color: 'var(--primary-dark)', padding: '2px 8px', borderRadius: 'var(--radius-full)', fontWeight: 700 }}>
+                      {enq.category}
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <Clock size={12} /> {enq.createdAt ? new Date(enq.createdAt).toLocaleDateString() : ''}
+                    </span>
+                    {enq.status === 'REPLIED' ? (
+                      <span className="badge badge-green" style={{ fontSize: '0.72rem' }}>
+                        <CheckCircle2 size={12} /> Answered
+                      </span>
+                    ) : (
+                      <span className="badge badge-warning" style={{ fontSize: '0.72rem' }}>Awaiting Reply</span>
+                    )}
+                  </div>
+                </div>
+
+                <p style={{ fontSize: '0.88rem', color: 'var(--text-main)', margin: '6px 0', lineHeight: 1.5 }}>
+                  "{enq.message}"
+                </p>
+
+                {enq.replyNotes && (
+                  <div style={{ marginTop: '8px', padding: '8px 12px', borderRadius: 'var(--radius-sm)', background: '#ecfdf5', border: '1px solid #a7f3d0', fontSize: '0.82rem', color: '#065f46' }}>
+                    <strong>Owner Reply:</strong> {enq.replyNotes}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* PASSWORD MODAL */}

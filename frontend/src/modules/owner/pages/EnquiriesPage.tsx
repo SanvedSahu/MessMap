@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import {
   MessageSquare,
@@ -7,67 +7,33 @@ import {
   MessageCircle,
   CheckCircle2,
   Clock,
-  Sparkles
+  Sparkles,
+  Loader2,
+  AlertCircle,
+  RefreshCw,
 } from 'lucide-react';
 import { useAuth } from '../../../context/AuthContext';
+import {
+  getOwnerEnquiriesApi,
+  replyOwnerEnquiryApi,
+  type OwnerEnquiryResponse,
+} from '../../../api/ownerApi';
 import type { OwnerOutletContextType } from '../layouts/OwnerLayout';
 import './EnquiriesPage.css';
 
 interface Enquiry {
   id: string;
   studentName: string;
+  studentEmail?: string;
   college: string;
   phone: string;
-  planType: 'Monthly (2 Meals)' | 'Monthly (Lunch only)' | 'Trial Meal' | 'Tiffin Service';
+  category: string;
+  planType: string;
   message: string;
   date: string;
   status: 'new' | 'replied';
   replyNotes?: string;
 }
-
-const mockEnquiries: Enquiry[] = [
-  {
-    id: 'e1',
-    studentName: 'Rahul Verma',
-    college: 'Bharati Vidyapeeth Engg College',
-    phone: '+91 98765 43210',
-    planType: 'Monthly (2 Meals)',
-    message: 'Hello sir, I am a 2nd year student staying in Katraj. Does your monthly plan include Sunday feast lunch? Also can I pay in two instalments?',
-    date: 'Today, 11:20 AM',
-    status: 'new',
-  },
-  {
-    id: 'e2',
-    studentName: 'Snehal Kulkarni',
-    college: 'PICT College',
-    phone: '+91 91234 56789',
-    planType: 'Trial Meal',
-    message: 'Can I come for a trial lunch today at 1:30 PM with 2 friends? We want to taste your regular chapati and dal.',
-    date: 'Today, 9:45 AM',
-    status: 'new',
-  },
-  {
-    id: 'e3',
-    studentName: 'Amit Patel',
-    college: 'SKN Sinhgad Institute',
-    phone: '+91 99887 76655',
-    planType: 'Tiffin Service',
-    message: 'Do you provide daily tiffin delivery to Ambegaon BK? Looking for dinner tiffin starting from next Monday.',
-    date: 'Yesterday, 6:15 PM',
-    status: 'new',
-  },
-  {
-    id: 'e4',
-    studentName: 'Priya Joshi',
-    college: 'MIT WPU',
-    phone: '+91 97654 32109',
-    planType: 'Monthly (Lunch only)',
-    message: 'Interested in lunch-only meal plan for 30 days. Can I visit today to taste the food before joining?',
-    date: '10 Oct, 2026',
-    status: 'replied',
-    replyNotes: 'Replied via call. Invited student for lunch tasting today.',
-  },
-];
 
 export const EnquiriesPage: React.FC = () => {
   const { user } = useAuth();
@@ -77,32 +43,100 @@ export const EnquiriesPage: React.FC = () => {
 
   const [filter, setFilter] = useState<'all' | 'new' | 'replied'>('all');
   const [search, setSearch] = useState('');
-  const [enquiries, setEnquiries] = useState<Enquiry[]>(() => (isDemoOwner ? mockEnquiries : []));
+  const [enquiries, setEnquiries] = useState<Enquiry[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
   const [replyInputId, setReplyInputId] = useState<string | null>(null);
   const [replyText, setReplyText] = useState('');
+  const [isReplying, setIsReplying] = useState<boolean>(false);
 
-  const handleMarkReplied = (id: string, notes?: string) => {
-    setEnquiries((prev) =>
-      prev.map((e) =>
-        e.id === id
-          ? {
-              ...e,
-              status: 'replied',
-              replyNotes: notes || e.replyNotes || 'Marked as replied by owner.',
-            }
-          : e
-      )
-    );
-    setReplyInputId(null);
-    setReplyText('');
+  const fetchEnquiries = async () => {
+    const token = localStorage.getItem('messmap_auth_token');
+    if (!token) {
+      setIsLoading(false);
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const res = await getOwnerEnquiriesApi(token, outletCtx?.ownerMess?.id);
+      if (res?.data) {
+        const loaded: Enquiry[] = res.data.map((item: OwnerEnquiryResponse) => ({
+          id: String(item.id),
+          studentName: item.studentName || 'Student Diner',
+          studentEmail: item.studentEmail,
+          college: item.studentCollege || 'Campus Student',
+          phone: item.studentPhone || 'Not provided',
+          category: item.category || 'General Enquiry',
+          planType: item.planPreference || item.category || 'General',
+          message: item.message,
+          date: item.createdAt
+            ? new Date(item.createdAt).toLocaleString('en-IN', {
+                dateStyle: 'medium',
+                timeStyle: 'short',
+              })
+            : 'Recently',
+          status: item.status === 'REPLIED' ? 'replied' : 'new',
+          replyNotes: item.replyNotes,
+        }));
+        setEnquiries(loaded);
+      } else {
+        setEnquiries([]);
+      }
+    } catch (err: any) {
+      console.error('[EnquiriesPage] Failed to fetch owner enquiries:', err);
+      setError(err?.message || 'Failed to load customer enquiries from server.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchEnquiries();
+  }, [outletCtx?.ownerMess?.id]);
+
+  const handleMarkReplied = async (id: string, notes?: string) => {
+    const token = localStorage.getItem('messmap_auth_token');
+    const finalNotes = notes || 'Marked as replied by owner.';
+
+    if (token) {
+      setIsReplying(true);
+      try {
+        await replyOwnerEnquiryApi(token, id, finalNotes);
+        setEnquiries((prev) =>
+          prev.map((e) =>
+            e.id === id
+              ? {
+                  ...e,
+                  status: 'replied',
+                  replyNotes: finalNotes,
+                }
+              : e
+          )
+        );
+        setReplyInputId(null);
+        setReplyText('');
+      } catch (err: any) {
+        console.error('[EnquiriesPage] Error replying to enquiry:', err);
+        setError(err?.message || 'Failed to submit enquiry reply.');
+      } finally {
+        setIsReplying(false);
+      }
+    }
   };
 
   const filteredEnquiries = enquiries.filter((e) => {
     const matchesFilter = filter === 'all' || e.status === filter;
+    const q = search.trim().toLowerCase();
     const matchesSearch =
-      e.studentName.toLowerCase().includes(search.toLowerCase()) ||
-      e.college.toLowerCase().includes(search.toLowerCase()) ||
-      e.phone.includes(search);
+      !q ||
+      e.studentName.toLowerCase().includes(q) ||
+      e.college.toLowerCase().includes(q) ||
+      e.phone.includes(q) ||
+      e.message.toLowerCase().includes(q) ||
+      e.category.toLowerCase().includes(q);
     return matchesFilter && matchesSearch;
   });
 
@@ -157,8 +191,43 @@ export const EnquiriesPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Enquiries Feed */}
-      <div className="enquiries-list">
+      {error && (
+        <div
+          style={{
+            backgroundColor: '#fef2f2',
+            border: '1px solid #fecaca',
+            color: '#991b1b',
+            padding: '0.85rem 1.25rem',
+            borderRadius: 'var(--radius-md)',
+            marginBottom: '1.25rem',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <AlertCircle size={18} color="#dc2626" />
+            <span>{error}</span>
+          </div>
+          <button
+            type="button"
+            className="btn btn-outline btn-sm"
+            onClick={fetchEnquiries}
+            style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
+          >
+            <RefreshCw size={14} /> Retry
+          </button>
+        </div>
+      )}
+
+      {isLoading ? (
+        <div style={{ textAlign: 'center', padding: '3rem 1rem', color: 'var(--text-muted)' }}>
+          <Loader2 size={32} className="animate-spin" style={{ margin: '0 auto 0.75rem' }} />
+          <p>Loading student & customer enquiries from server...</p>
+        </div>
+      ) : (
+        /* Enquiries Feed */
+        <div className="enquiries-list">
         {filteredEnquiries.map((item) => (
           <div key={item.id} className={`card enquiry-card ${item.status === 'new' ? 'is-new' : ''}`}>
             <div className="enquiry-card-header">
@@ -270,6 +339,7 @@ export const EnquiriesPage: React.FC = () => {
           </div>
         )}
       </div>
+      )}
     </div>
   );
 };

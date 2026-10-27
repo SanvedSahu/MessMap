@@ -238,6 +238,175 @@ public class OwnerMenuService {
     }
 
     /**
+     * Create or update the dishes for a specific day and meal type (Breakfast, Lunch, or Dinner).
+     * Enforces single-record uniqueness for (messId, dayOfWeek, mealType) to prevent duplicate records.
+     */
+    @Transactional
+    public DailyMealResponse updateDailyMealMenu(Long ownerId, UpdateDailyMealRequest request, boolean isAdmin) {
+        log.info("Updating daily meal menu: ownerId={}, messId={}, day={}, mealType={}",
+                ownerId, request.getMessId(), request.getDayOfWeek(), request.getMealType());
+
+        Mess mess = resolveTargetMess(ownerId, request.getMessId(), isAdmin, "manage daily menu");
+        String dayOfWeek = normalizeAndValidateDayOfWeek(request.getDayOfWeek());
+        if ("ALL".equals(dayOfWeek)) {
+            throw new BadRequestException("Please specify a specific weekday (e.g. MONDAY..SUNDAY)");
+        }
+        MealType mealType = request.getMealType();
+        validateOwnerMealType(mealType);
+
+        String dishes = request.getDishes() != null ? request.getDishes().trim() : "";
+        if (dishes.isBlank()) {
+            throw new BadRequestException("Dishes cannot be blank");
+        }
+
+        List<MenuItem> existing = menuItemRepository.findByMessIdAndDayOfWeekIgnoreCaseAndMealType(
+                mess.getId(), dayOfWeek, mealType
+        );
+
+        MenuItem target;
+        if (!existing.isEmpty()) {
+            target = existing.get(0);
+            target.setName(dishes);
+            if (request.getDescription() != null) {
+                target.setDescription(request.getDescription().trim());
+            }
+            if (request.getPrice() != null) {
+                target.setPrice(request.getPrice());
+            }
+            if (request.getIsAvailable() != null) {
+                target.setIsAvailable(request.getIsAvailable());
+            }
+            if (request.getIsSpecial() != null) {
+                target.setIsSpecial(request.getIsSpecial());
+            }
+
+            for (int i = 1; i < existing.size(); i++) {
+                menuItemRepository.delete(existing.get(i));
+            }
+        } else {
+            target = MenuItem.builder()
+                    .mess(mess)
+                    .dayOfWeek(dayOfWeek)
+                    .mealType(mealType)
+                    .name(dishes)
+                    .description(request.getDescription() != null ? request.getDescription().trim() : null)
+                    .price(request.getPrice())
+                    .isAvailable(request.getIsAvailable() != null ? request.getIsAvailable() : true)
+                    .isSpecial(request.getIsSpecial() != null ? request.getIsSpecial() : false)
+                    .build();
+        }
+
+        menuItemRepository.save(target);
+        log.info("Saved daily meal for mess id={}, day={}, meal={}", mess.getId(), dayOfWeek, mealType);
+
+        return getMessDailyMenu(mess.getId(), dayOfWeek);
+    }
+
+    /**
+     * Retrieve the daily menu for an authenticated owner's mess.
+     */
+    @Transactional(readOnly = true)
+    public DailyMealResponse getOwnerDailyMenu(Long ownerId, Long messId, String dayOfWeek, boolean isAdmin) {
+        Mess mess = resolveTargetMess(ownerId, messId, isAdmin, "view daily menu");
+        return getMessDailyMenu(mess.getId(), dayOfWeek);
+    }
+
+    /**
+     * Retrieve the weekly menu for an authenticated owner's mess.
+     */
+    @Transactional(readOnly = true)
+    public WeeklyMenuResponse getOwnerWeeklyMenu(Long ownerId, Long messId, boolean isAdmin) {
+        Mess mess = resolveTargetMess(ownerId, messId, isAdmin, "view weekly menu");
+        return getMessWeeklyMenu(mess.getId());
+    }
+
+    /**
+     * Retrieve the daily menu for a specific mess and day of week.
+     * Accessible by students, public, and owners.
+     */
+    @Transactional(readOnly = true)
+    public DailyMealResponse getMessDailyMenu(Long messId, String dayOfWeek) {
+        Mess mess = messRepository.findById(messId)
+                .orElseThrow(() -> new ResourceNotFoundException("Mess not found with id: " + messId));
+
+        String targetDay = dayOfWeek != null && !dayOfWeek.isBlank()
+                ? normalizeAndValidateDayOfWeek(dayOfWeek)
+                : "MONDAY";
+
+        List<MenuItem> items = menuItemRepository.findByMessIdAndDayOfWeekIgnoreCase(mess.getId(), targetDay);
+
+        Map<String, List<MenuItemDto>> meals = new LinkedHashMap<>();
+        meals.put("BREAKFAST", new ArrayList<>());
+        meals.put("LUNCH", new ArrayList<>());
+        meals.put("DINNER", new ArrayList<>());
+
+        for (MenuItem item : items) {
+            String meal = item.getMealType() != null ? item.getMealType().name() : "LUNCH";
+            meals.computeIfAbsent(meal, k -> new ArrayList<>()).add(MenuItemDto.fromEntity(item));
+        }
+
+        List<MenuItemDto> breakfastList = meals.getOrDefault("BREAKFAST", Collections.emptyList());
+        List<MenuItemDto> lunchList = meals.getOrDefault("LUNCH", Collections.emptyList());
+        List<MenuItemDto> dinnerList = meals.getOrDefault("DINNER", Collections.emptyList());
+
+        String breakfastStr = formatDishList(breakfastList);
+        String lunchStr = formatDishList(lunchList);
+        String dinnerStr = formatDishList(dinnerList);
+
+        return DailyMealResponse.builder()
+                .messId(mess.getId())
+                .messName(mess.getName())
+                .dayOfWeek(targetDay)
+                .breakfast(breakfastStr)
+                .lunch(lunchStr)
+                .dinner(dinnerStr)
+                .breakfastItems(breakfastList)
+                .lunchItems(lunchList)
+                .dinnerItems(dinnerList)
+                .meals(meals)
+                .build();
+    }
+
+    /**
+     * Retrieve the full 7-day weekly menu for a specific mess.
+     */
+    @Transactional(readOnly = true)
+    public WeeklyMenuResponse getMessWeeklyMenu(Long messId) {
+        Mess mess = messRepository.findById(messId)
+                .orElseThrow(() -> new ResourceNotFoundException("Mess not found with id: " + messId));
+
+        List<DailyMealResponse> weeklySchedule = new ArrayList<>();
+        Map<String, DailyMealResponse> scheduleByDay = new LinkedHashMap<>();
+
+        for (String day : STANDARD_DAYS) {
+            DailyMealResponse daily = getMessDailyMenu(mess.getId(), day);
+            weeklySchedule.add(daily);
+            scheduleByDay.put(day, daily);
+        }
+
+        return WeeklyMenuResponse.builder()
+                .messId(mess.getId())
+                .messName(mess.getName())
+                .weeklySchedule(weeklySchedule)
+                .scheduleByDay(scheduleByDay)
+                .build();
+    }
+
+    private String formatDishList(List<MenuItemDto> items) {
+        if (items == null || items.isEmpty()) {
+            return null;
+        }
+        return items.stream()
+                .filter(it -> it.getIsAvailable() == null || it.getIsAvailable())
+                .map(MenuItemDto::getName)
+                .filter(Objects::nonNull)
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .reduce((a, b) -> a + ", " + b)
+                .orElse(null);
+    }
+
+    /**
      * Helper to resolve the target mess either by primary key or from the authenticated owner's listings.
      */
     private Mess resolveTargetMess(Long ownerId, Long messId, boolean isAdmin, String action) {

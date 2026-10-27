@@ -143,4 +143,76 @@ public class OwnerMenuController {
         MessPricingDto response = ownerMenuService.updateMessPricing(userPrincipal.getId(), targetMessId, request, isAdmin);
         return ResponseEntity.ok(ApiResponse.success("Pricing updated successfully", response));
     }
+
+    /**
+     * Create or update daily meal menu (Breakfast, Lunch, or Dinner) for a specific day.
+     * Routes: PUT /api/owner/mess/daily-menu, PUT /api/v1/owner/mess/daily-menu,
+     *         PUT /api/owner/mess/{id}/daily-menu, PUT /api/v1/owner/mess/{id}/daily-menu
+     */
+    @PutMapping({
+            "/api/owner/mess/daily-menu",
+            "/api/v1/owner/mess/daily-menu",
+            "/api/owner/mess/{id}/daily-menu",
+            "/api/v1/owner/mess/{id}/daily-menu"
+    })
+    public ResponseEntity<ApiResponse<DailyMealResponse>> updateDailyMeal(
+            @PathVariable(value = "id", required = false) Long pathMessId,
+            @AuthenticationPrincipal UserPrincipal userPrincipal,
+            @Valid @RequestBody UpdateDailyMealRequest request
+    ) {
+        if (pathMessId != null && request.getMessId() == null) {
+            request.setMessId(pathMessId);
+        }
+        boolean isAdmin = userPrincipal.getRole() == Role.ROLE_ADMIN;
+        log.info("PUT owner daily meal: ownerId={}, messId={}, day={}, meal={}",
+                userPrincipal.getId(), request.getMessId(), request.getDayOfWeek(), request.getMealType());
+
+        DailyMealResponse response = ownerMenuService.updateDailyMealMenu(userPrincipal.getId(), request, isAdmin);
+        return ResponseEntity.ok(ApiResponse.success("Daily meal updated successfully", response));
+    }
+
+    /**
+     * Retrieve daily meal menu for owner's mess.
+     * Routes: GET /api/owner/mess/daily-menu, GET /api/v1/owner/mess/daily-menu,
+     *         GET /api/owner/mess/{id}/daily-menu, GET /api/v1/owner/mess/{id}/daily-menu
+     */
+    @GetMapping({
+            "/api/owner/mess/daily-menu",
+            "/api/v1/owner/mess/daily-menu",
+            "/api/owner/mess/{id}/daily-menu",
+            "/api/v1/owner/mess/{id}/daily-menu"
+    })
+    public ResponseEntity<ApiResponse<DailyMealResponse>> getOwnerDailyMenu(
+            @PathVariable(value = "id", required = false) Long pathMessId,
+            @RequestParam(value = "messId", required = false) Long queryMessId,
+            @RequestParam(value = "day", required = false) String day,
+            @AuthenticationPrincipal UserPrincipal userPrincipal
+    ) {
+        Long targetMessId = pathMessId != null ? pathMessId : queryMessId;
+        boolean isAdmin = userPrincipal.getRole() == Role.ROLE_ADMIN;
+        DailyMealResponse response = ownerMenuService.getOwnerDailyMenu(userPrincipal.getId(), targetMessId, day, isAdmin);
+        return ResponseEntity.ok(ApiResponse.success("Daily menu retrieved successfully", response));
+    }
+
+    /**
+     * Retrieve weekly schedule for owner's mess.
+     * Routes: GET /api/owner/mess/weekly-menu, GET /api/v1/owner/mess/weekly-menu,
+     *         GET /api/owner/mess/{id}/weekly-menu, GET /api/v1/owner/mess/{id}/weekly-menu
+     */
+    @GetMapping({
+            "/api/owner/mess/weekly-menu",
+            "/api/v1/owner/mess/weekly-menu",
+            "/api/owner/mess/{id}/weekly-menu",
+            "/api/v1/owner/mess/{id}/weekly-menu"
+    })
+    public ResponseEntity<ApiResponse<WeeklyMenuResponse>> getOwnerWeeklyMenu(
+            @PathVariable(value = "id", required = false) Long pathMessId,
+            @RequestParam(value = "messId", required = false) Long queryMessId,
+            @AuthenticationPrincipal UserPrincipal userPrincipal
+    ) {
+        Long targetMessId = pathMessId != null ? pathMessId : queryMessId;
+        boolean isAdmin = userPrincipal.getRole() == Role.ROLE_ADMIN;
+        WeeklyMenuResponse response = ownerMenuService.getOwnerWeeklyMenu(userPrincipal.getId(), targetMessId, isAdmin);
+        return ResponseEntity.ok(ApiResponse.success("Weekly menu retrieved successfully", response));
+    }
 }

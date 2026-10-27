@@ -26,6 +26,12 @@ public interface MenuItemRepository extends JpaRepository<MenuItem, Long> {
 
     List<MenuItem> findByMessIdAndMealTypeAndIsAvailableTrue(Long messId, MealType mealType);
 
+    List<MenuItem> findByMessIdAndDayOfWeekIgnoreCase(Long messId, String dayOfWeek);
+
+    List<MenuItem> findByMessIdAndDayOfWeekIgnoreCaseAndMealType(Long messId, String dayOfWeek, MealType mealType);
+
+    List<MenuItem> findByMessIdAndDayOfWeekIgnoreCaseAndMealTypeAndIsAvailableTrue(Long messId, String dayOfWeek, MealType mealType);
+
     long countByMessId(Long messId);
 
     @Query("SELECT m FROM MenuItem m JOIN FETCH m.mess mess JOIN FETCH mess.owner WHERE m.id = :id")

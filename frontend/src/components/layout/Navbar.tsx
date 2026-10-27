@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Menu, MapPin, Heart } from 'lucide-react';
+import { Menu, Heart } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useFavorites } from '../../context/FavoritesContext';
 import { StudentNotificationBell } from './StudentNotificationBell';
@@ -16,7 +16,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
 
   return (
     <header className="app-header">
-      {/* Left: Mobile Toggle & Location Pill */}
+      {/* Left: Mobile Toggle */}
       <div className="header-left">
         <button
           onClick={onToggleSidebar}
@@ -25,11 +25,6 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
         >
           <Menu size={20} />
         </button>
-
-        <div className="header-location-pill" title="Current student campus search zone">
-          <MapPin size={16} className="loc-icon" />
-          <span>Pune Campus (FC Road & Shivajinagar)</span>
-        </div>
       </div>
 
       {/* Right: Meal Window, Notifications, Favorites, Subscription Pill & Profile */}

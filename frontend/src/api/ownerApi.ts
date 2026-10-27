@@ -711,3 +711,192 @@ export async function getOwnerSuspensionReviewsApi(
   }
   return data;
 }
+
+// -----------------------------------------------------------------------------
+// Issue: Owner Enquiries APIs
+// -----------------------------------------------------------------------------
+
+export interface OwnerEnquiryResponse {
+  id: number;
+  messId: number;
+  messName: string;
+  studentId: number;
+  studentName: string;
+  studentEmail: string;
+  studentPhone?: string;
+  studentCollege?: string;
+  category: string;
+  message: string;
+  planPreference?: string;
+  status: 'NEW' | 'REPLIED';
+  replyNotes?: string;
+  repliedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * Retrieve enquiries for the authenticated owner's mess.
+ * Routes: GET /api/owner/mess/enquiries, GET /api/v1/owner/mess/enquiries
+ */
+export async function getOwnerEnquiriesApi(
+  token: string,
+  messId?: number,
+  status?: string
+): Promise<StandardApiResponse<OwnerEnquiryResponse[]>> {
+  const params = new URLSearchParams();
+  if (messId) params.append('messId', String(messId));
+  if (status) params.append('status', status);
+  const qs = params.toString() ? `?${params.toString()}` : '';
+
+  const response = await fetch(`${API_BASE_URL}/owner/mess/enquiries${qs}`, {
+    method: 'GET',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.message || 'Failed to fetch customer enquiries.');
+  }
+  return data;
+}
+
+/**
+ * Reply to or resolve a customer enquiry.
+ * Routes: PUT /api/owner/mess/enquiries/{id}/reply, PUT /api/v1/owner/mess/enquiries/{id}/reply
+ */
+export async function replyOwnerEnquiryApi(
+  token: string,
+  enquiryId: number | string,
+  replyNotes?: string
+): Promise<StandardApiResponse<OwnerEnquiryResponse>> {
+  const response = await fetch(`${API_BASE_URL}/owner/mess/enquiries/${enquiryId}/reply`, {
+    method: 'PUT',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ replyNotes }),
+  });
+
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.message || 'Failed to update enquiry response.');
+  }
+  return data;
+}
+
+// -----------------------------------------------------------------------------
+// Issue: Owner Daily & Weekly Menu APIs
+// -----------------------------------------------------------------------------
+
+export interface DailyMealResponse {
+  messId: number;
+  messName: string;
+  dayOfWeek: string;
+  breakfast?: string;
+  lunch?: string;
+  dinner?: string;
+  breakfastItems?: any[];
+  lunchItems?: any[];
+  dinnerItems?: any[];
+  meals?: Record<string, any[]>;
+}
+
+export interface WeeklyMenuResponse {
+  messId: number;
+  messName: string;
+  weeklySchedule: DailyMealResponse[];
+  scheduleByDay: Record<string, DailyMealResponse>;
+}
+
+export interface UpdateDailyMealPayload {
+  messId?: number;
+  dayOfWeek: string;
+  mealType: 'BREAKFAST' | 'LUNCH' | 'DINNER';
+  dishes: string;
+  description?: string;
+  price?: number;
+  isAvailable?: boolean;
+  isSpecial?: boolean;
+}
+
+/**
+ * Update daily meal menu for Breakfast, Lunch, or Dinner.
+ * Routes: PUT /api/owner/mess/daily-menu, PUT /api/v1/owner/mess/daily-menu
+ */
+export async function updateDailyMealMenuApi(
+  token: string,
+  payload: UpdateDailyMealPayload
+): Promise<StandardApiResponse<DailyMealResponse>> {
+  const response = await fetch(`${API_BASE_URL}/owner/mess/daily-menu`, {
+    method: 'PUT',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.message || 'Failed to update daily meal menu.');
+  }
+  return data;
+}
+
+/**
+ * Retrieve daily meal menu for owner's mess.
+ * Routes: GET /api/owner/mess/daily-menu, GET /api/v1/owner/mess/daily-menu
+ */
+export async function getOwnerDailyMenuApi(
+  token: string,
+  messId?: number,
+  day?: string
+): Promise<StandardApiResponse<DailyMealResponse>> {
+  const params = new URLSearchParams();
+  if (messId) params.append('messId', String(messId));
+  if (day) params.append('day', day);
+  const qs = params.toString() ? `?${params.toString()}` : '';
+
+  const response = await fetch(`${API_BASE_URL}/owner/mess/daily-menu${qs}`, {
+    method: 'GET',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.message || 'Failed to fetch owner daily menu.');
+  }
+  return data;
+}
+
+/**
+ * Retrieve full weekly schedule for owner's mess.
+ * Routes: GET /api/owner/mess/weekly-menu, GET /api/v1/owner/mess/weekly-menu
+ */
+export async function getOwnerWeeklyMenuApi(
+  token: string,
+  messId?: number
+): Promise<StandardApiResponse<WeeklyMenuResponse>> {
+  const qs = messId ? `?messId=${messId}` : '';
+  const response = await fetch(`${API_BASE_URL}/owner/mess/weekly-menu${qs}`, {
+    method: 'GET',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.message || 'Failed to fetch owner weekly menu.');
+  }
+  return data;
+}

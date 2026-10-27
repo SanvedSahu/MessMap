@@ -14,6 +14,11 @@ import {
   Save,
   Store,
   AlertCircle,
+  Coffee,
+  Sun,
+  Moon,
+  Calendar,
+  Loader2,
 } from 'lucide-react';
 import { useAuth } from '../../../context/AuthContext';
 import {
@@ -22,6 +27,8 @@ import {
   updateMenuItemApi,
   deleteMenuItemApi,
   updateMessPricingApi,
+  getOwnerDailyMenuApi,
+  updateDailyMealMenuApi,
   type OwnerMessProfileResponse,
 } from '../../../api/ownerApi';
 import './MenuPage.css';
@@ -178,6 +185,18 @@ export const MenuPage: React.FC = () => {
   const [monthlyPrice, setMonthlyPrice] = useState<number>(3200);
   const [isSavingPricing, setIsSavingPricing] = useState(false);
 
+  // Daily Meal Menu (Weekly Schedule) state
+  const weekDaysList = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+  const [selectedScheduleDay, setSelectedScheduleDay] = useState<string>('Monday');
+  const [dailyBreakfast, setDailyBreakfast] = useState<string>('');
+  const [initialBreakfast, setInitialBreakfast] = useState<string>('');
+  const [dailyLunch, setDailyLunch] = useState<string>('');
+  const [initialLunch, setInitialLunch] = useState<string>('');
+  const [dailyDinner, setDailyDinner] = useState<string>('');
+  const [initialDinner, setInitialDinner] = useState<string>('');
+  const [loadingDailyMenu, setLoadingDailyMenu] = useState<boolean>(false);
+  const [savingMeal, setSavingMeal] = useState<'BREAKFAST' | 'LUNCH' | 'DINNER' | null>(null);
+
   // Form states for Add/Edit Dish
   const [dishName, setDishName] = useState('');
   const [dishDesc, setDishDesc] = useState('');
@@ -276,6 +295,90 @@ export const MenuPage: React.FC = () => {
     } else {
       showToast('Pricing saved locally (offline mode).');
       setIsSavingPricing(false);
+    }
+  };
+
+  // Fetch daily menu for selected day from backend
+  useEffect(() => {
+    const token = localStorage.getItem('messmap_auth_token');
+    if (!token) return;
+
+    let isCurrent = true;
+    setLoadingDailyMenu(true);
+
+    getOwnerDailyMenuApi(token, activeMessId, selectedScheduleDay)
+      .then((res) => {
+        if (!isCurrent) return;
+        if (res?.data) {
+          const b = res.data.breakfast || '';
+          const l = res.data.lunch || '';
+          const d = res.data.dinner || '';
+          setDailyBreakfast(b);
+          setInitialBreakfast(b);
+          setDailyLunch(l);
+          setInitialLunch(l);
+          setDailyDinner(d);
+          setInitialDinner(d);
+        } else {
+          setDailyBreakfast('');
+          setInitialBreakfast('');
+          setDailyLunch('');
+          setInitialLunch('');
+          setDailyDinner('');
+          setInitialDinner('');
+        }
+      })
+      .catch((err) => {
+        if (!isCurrent) return;
+        console.warn('Backend daily menu fetch note:', err.message);
+      })
+      .finally(() => {
+        if (isCurrent) setLoadingDailyMenu(false);
+      });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [activeMessId, selectedScheduleDay]);
+
+  const handleSaveDailyMeal = async (mealType: 'BREAKFAST' | 'LUNCH' | 'DINNER') => {
+    const dishes =
+      mealType === 'BREAKFAST'
+        ? dailyBreakfast
+        : mealType === 'LUNCH'
+        ? dailyLunch
+        : dailyDinner;
+
+    if (!dishes.trim()) {
+      showErrorToast(`Please enter at least one dish for ${mealType.toLowerCase()}.`);
+      return;
+    }
+
+    const token = localStorage.getItem('messmap_auth_token');
+    if (!token) {
+      showErrorToast('You must be signed in to save daily meal menus.');
+      return;
+    }
+
+    setSavingMeal(mealType);
+    try {
+      await updateDailyMealMenuApi(token, {
+        messId: activeMessId,
+        dayOfWeek: selectedScheduleDay,
+        mealType,
+        dishes: dishes.trim(),
+      });
+
+      if (mealType === 'BREAKFAST') setInitialBreakfast(dishes.trim());
+      if (mealType === 'LUNCH') setInitialLunch(dishes.trim());
+      if (mealType === 'DINNER') setInitialDinner(dishes.trim());
+
+      showToast(`Saved ${selectedScheduleDay} ${mealType.toLowerCase()} menu to database! 🍛`);
+    } catch (err: any) {
+      console.error(`Failed to save ${mealType} menu:`, err);
+      showErrorToast(err?.message || `Failed to save ${mealType.toLowerCase()} menu.`);
+    } finally {
+      setSavingMeal(null);
     }
   };
 
@@ -736,6 +839,217 @@ export const MenuPage: React.FC = () => {
             />
           </div>
         </form>
+      </section>
+
+      {/* SECTION: MANAGE DAILY MENUS (WEEKLY SCHEDULE) */}
+      <section className="card" style={{ marginBottom: '1.75rem', padding: '1.5rem', border: '1.5px solid var(--border-color)', boxShadow: 'var(--shadow-sm)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.25rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div style={{ width: '40px', height: '40px', borderRadius: 'var(--radius-md)', background: 'var(--primary-light)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Calendar size={22} color="var(--primary)" />
+            </div>
+            <div>
+              <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-main)', margin: 0 }}>
+                Manage Daily Meal Menus
+              </h3>
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: '2px 0 0 0' }}>
+                Enter and update dishes for Monday through Sunday. These dishes persist in the database and display dynamically to students.
+              </p>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            {loadingDailyMenu && (
+              <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Loader2 size={14} className="animate-spin" /> Loading schedule...
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Day Selector Pills */}
+        <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '8px', marginBottom: '1.5rem' }}>
+          {weekDaysList.map((day) => {
+            const active = selectedScheduleDay === day;
+            return (
+              <button
+                key={day}
+                type="button"
+                onClick={() => setSelectedScheduleDay(day)}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: 'var(--radius-md)',
+                  fontSize: '0.88rem',
+                  fontWeight: 700,
+                  whiteSpace: 'nowrap',
+                  border: active ? '1.5px solid var(--primary)' : '1px solid var(--border-color)',
+                  background: active ? 'var(--primary-light)' : '#ffffff',
+                  color: active ? 'var(--primary-dark)' : 'var(--text-muted)',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                {day}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* 3 Meal Cards Grid */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem' }}>
+          {/* Breakfast Card */}
+          <div style={{ background: 'var(--bg-card-subtle)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '1.25rem', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 800, color: 'var(--warning-dark)' }}>
+                <Coffee size={18} />
+                <span>Breakfast (07:30 – 10:00 AM)</span>
+              </div>
+              {dailyBreakfast !== initialBreakfast ? (
+                <span className="badge badge-warning" style={{ fontSize: '0.7rem' }}>Unsaved Changes</span>
+              ) : !dailyBreakfast.trim() ? (
+                <span className="badge" style={{ fontSize: '0.7rem', background: '#f1f5f9', color: '#64748b' }}>Not Set</span>
+              ) : (
+                <span className="badge badge-green" style={{ fontSize: '0.7rem' }}>
+                  <CheckCircle2 size={11} /> Saved
+                </span>
+              )}
+            </div>
+
+            <label style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '6px' }}>
+              Dishes served on {selectedScheduleDay}:
+            </label>
+            <textarea
+              rows={3}
+              placeholder="e.g. Kanda Poha, Boiled Eggs, Sprouts, Masala Chai"
+              value={dailyBreakfast}
+              onChange={(e) => setDailyBreakfast(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '8px 10px',
+                borderRadius: 'var(--radius-sm)',
+                border: '1px solid var(--border-color)',
+                backgroundColor: '#ffffff',
+                color: 'var(--text-main)',
+                fontSize: '0.88rem',
+                resize: 'vertical',
+                marginBottom: '1rem',
+              }}
+            />
+
+            <button
+              type="button"
+              className="btn btn-primary btn-sm"
+              onClick={() => handleSaveDailyMeal('BREAKFAST')}
+              disabled={savingMeal === 'BREAKFAST' || dailyBreakfast === initialBreakfast || !dailyBreakfast.trim()}
+              style={{ marginTop: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+            >
+              <Save size={14} />
+              {savingMeal === 'BREAKFAST' ? 'Saving...' : 'Save Breakfast'}
+            </button>
+          </div>
+
+          {/* Lunch Card */}
+          <div style={{ background: 'var(--primary-light)', border: '1px solid var(--success-border)', borderRadius: 'var(--radius-md)', padding: '1.25rem', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 800, color: 'var(--primary-dark)' }}>
+                <Sun size={18} />
+                <span>Lunch Thali (12:15 – 03:00 PM)</span>
+              </div>
+              {dailyLunch !== initialLunch ? (
+                <span className="badge badge-warning" style={{ fontSize: '0.7rem' }}>Unsaved Changes</span>
+              ) : !dailyLunch.trim() ? (
+                <span className="badge" style={{ fontSize: '0.7rem', background: '#f1f5f9', color: '#64748b' }}>Not Set</span>
+              ) : (
+                <span className="badge badge-green" style={{ fontSize: '0.7rem' }}>
+                  <CheckCircle2 size={11} /> Saved
+                </span>
+              )}
+            </div>
+
+            <label style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '6px' }}>
+              Dishes served on {selectedScheduleDay}:
+            </label>
+            <textarea
+              rows={3}
+              placeholder="e.g. Dal Makhani, Shahi Paneer, Jeera Rice, Hot Phulkas, Kheer"
+              value={dailyLunch}
+              onChange={(e) => setDailyLunch(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '8px 10px',
+                borderRadius: 'var(--radius-sm)',
+                border: '1px solid var(--border-color)',
+                backgroundColor: '#ffffff',
+                color: 'var(--text-main)',
+                fontSize: '0.88rem',
+                resize: 'vertical',
+                marginBottom: '1rem',
+              }}
+            />
+
+            <button
+              type="button"
+              className="btn btn-primary btn-sm"
+              onClick={() => handleSaveDailyMeal('LUNCH')}
+              disabled={savingMeal === 'LUNCH' || dailyLunch === initialLunch || !dailyLunch.trim()}
+              style={{ marginTop: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+            >
+              <Save size={14} />
+              {savingMeal === 'LUNCH' ? 'Saving...' : 'Save Lunch'}
+            </button>
+          </div>
+
+          {/* Dinner Card */}
+          <div style={{ background: 'var(--bg-card-subtle)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '1.25rem', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 800, color: '#4338ca' }}>
+                <Moon size={18} />
+                <span>Dinner Thali (07:30 – 10:15 PM)</span>
+              </div>
+              {dailyDinner !== initialDinner ? (
+                <span className="badge badge-warning" style={{ fontSize: '0.7rem' }}>Unsaved Changes</span>
+              ) : !dailyDinner.trim() ? (
+                <span className="badge" style={{ fontSize: '0.7rem', background: '#f1f5f9', color: '#64748b' }}>Not Set</span>
+              ) : (
+                <span className="badge badge-green" style={{ fontSize: '0.7rem' }}>
+                  <CheckCircle2 size={11} /> Saved
+                </span>
+              )}
+            </div>
+
+            <label style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '6px' }}>
+              Dishes served on {selectedScheduleDay}:
+            </label>
+            <textarea
+              rows={3}
+              placeholder="e.g. Egg Curry, Shev Bhaji, Dal Tadka, Rice, Chapati"
+              value={dailyDinner}
+              onChange={(e) => setDailyDinner(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '8px 10px',
+                borderRadius: 'var(--radius-sm)',
+                border: '1px solid var(--border-color)',
+                backgroundColor: '#ffffff',
+                color: 'var(--text-main)',
+                fontSize: '0.88rem',
+                resize: 'vertical',
+                marginBottom: '1rem',
+              }}
+            />
+
+            <button
+              type="button"
+              className="btn btn-primary btn-sm"
+              onClick={() => handleSaveDailyMeal('DINNER')}
+              disabled={savingMeal === 'DINNER' || dailyDinner === initialDinner || !dailyDinner.trim()}
+              style={{ marginTop: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+            >
+              <Save size={14} />
+              {savingMeal === 'DINNER' ? 'Saving...' : 'Save Dinner'}
+            </button>
+          </div>
+        </div>
       </section>
 
       {/* Control bar: Tabs & Search */}

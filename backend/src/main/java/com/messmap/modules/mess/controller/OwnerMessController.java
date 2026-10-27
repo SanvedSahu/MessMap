@@ -76,7 +76,7 @@ public class OwnerMessController {
      * Retrieve a specific mess profile by ID with ownership authorization.
      * Routes: GET /api/owner/mess/{id}, GET /api/owner/messes/{id}, GET /api/v1/owner/messes/{id}, GET /api/v1/owner/mess/{id}
      */
-    @GetMapping({"/api/owner/mess/{id}", "/api/owner/messes/{id}", "/api/v1/owner/messes/{id}", "/api/v1/owner/mess/{id}"})
+    @GetMapping({"/api/owner/mess/{id:[0-9]+}", "/api/owner/messes/{id:[0-9]+}", "/api/v1/owner/messes/{id:[0-9]+}", "/api/v1/owner/mess/{id:[0-9]+}"})
     public ResponseEntity<ApiResponse<MessOwnerResponse>> getMessById(
             @PathVariable("id") Long id,
             @AuthenticationPrincipal UserPrincipal userPrincipal
@@ -106,7 +106,7 @@ public class OwnerMessController {
      * Update general profile attributes of a specific mess by ID.
      * Routes: PUT /api/owner/mess/{id}, PUT /api/owner/messes/{id}, PUT /api/v1/owner/messes/{id}, PUT /api/v1/owner/mess/{id}
      */
-    @PutMapping({"/api/owner/mess/{id}", "/api/owner/messes/{id}", "/api/v1/owner/messes/{id}", "/api/v1/owner/mess/{id}"})
+    @PutMapping({"/api/owner/mess/{id:[0-9]+}", "/api/owner/messes/{id:[0-9]+}", "/api/v1/owner/messes/{id:[0-9]+}", "/api/v1/owner/mess/{id:[0-9]+}"})
     public ResponseEntity<ApiResponse<MessOwnerResponse>> updateMessById(
             @PathVariable("id") Long id,
             @AuthenticationPrincipal UserPrincipal userPrincipal,
