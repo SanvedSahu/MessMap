@@ -26,8 +26,11 @@ import { useMessData } from '../../context/MessDataContext';
 import {
   geocodeAddress,
   reverseGeocodeCoordinates,
-  isValidCoordinates,
 } from '../../utils/geocoding';
+import {
+  getCurrentDeviceLocation,
+  isValidCoordinates,
+} from '../../utils/geolocation';
 
 // Custom Map Marker Pin for Mess Registration Location
 const pinIcon = L.divIcon({
@@ -124,6 +127,7 @@ export const RegisterPage: React.FC = () => {
   const [pincodeUnavailable, setPincodeUnavailable] = useState<boolean>(false);
   const reverseGeocodeCounterRef = useRef<number>(0);
   const [geoError, setGeoError] = useState<string | null>(null);
+  const [reverseGeocodeError, setReverseGeocodeError] = useState<string | null>(null);
   const [foodType, setFoodType] = useState<'Pure Veg' | 'Veg & Non-Veg'>('Pure Veg');
   const [monthlyPrice, setMonthlyPrice] = useState('3200');
   const [dailyPrice, setDailyPrice] = useState('100');
@@ -162,11 +166,13 @@ export const RegisterPage: React.FC = () => {
 
   /**
    * Reverse-geocodes exact coordinates and auto-fills Area / Campus Locality and PIN Code.
-   * Uses an asynchronous request counter ref to prevent race conditions from rapid map clicks or pin drags.
+   * Keeps geolocation success and reverse-geocoding separate:
+   * Even if reverse geocoding fails, coordinates remain firmly locked and manual address entry is preserved.
    */
   const resolveLocationDetails = async (lat: number, lng: number) => {
     const currentRequestId = ++reverseGeocodeCounterRef.current;
     setIsResolvingLocation(true);
+    setReverseGeocodeError(null);
     // Never retain a stale PIN code when the location changes
     setPincode('');
     setPincodeUnavailable(false);
@@ -201,16 +207,20 @@ export const RegisterPage: React.FC = () => {
         if (!address.trim() && rev.address) {
           setAddress(rev.address);
         }
+        setReverseGeocodeError(null);
       } else {
-        setArea('');
-        setPincode('');
+        // Reverse geocoding failed or returned null, but coordinates are preserved
         setPincodeUnavailable(true);
+        setReverseGeocodeError(
+          'Coordinates were detected, but the address could not be retrieved. You can enter the address manually.'
+        );
       }
     } catch {
       if (currentRequestId !== reverseGeocodeCounterRef.current) return;
-      setArea('');
-      setPincode('');
       setPincodeUnavailable(true);
+      setReverseGeocodeError(
+        'Coordinates were detected, but the address could not be retrieved. You can enter the address manually.'
+      );
     } finally {
       if (currentRequestId === reverseGeocodeCounterRef.current) {
         setIsResolvingLocation(false);
@@ -224,6 +234,7 @@ export const RegisterPage: React.FC = () => {
       return;
     }
     setGeoError(null);
+    setReverseGeocodeError(null);
     setIsManualLocation(true);
     const fixedLat = Number(lat.toFixed(6));
     const fixedLng = Number(lng.toFixed(6));
@@ -233,55 +244,33 @@ export const RegisterPage: React.FC = () => {
     resolveLocationDetails(fixedLat, fixedLng);
   };
 
-  const handleUseCurrentLocation = () => {
-    if (!navigator.geolocation) {
-      setGeoError('Geolocation is not supported by your browser. Please pin your mess entrance directly on the map.');
-      return;
-    }
-
+  const handleUseCurrentLocation = async () => {
     setIsLocating(true);
     setGeoError(null);
+    setReverseGeocodeError(null);
 
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setIsLocating(false);
-        const lat = Number(pos.coords.latitude.toFixed(6));
-        const lng = Number(pos.coords.longitude.toFixed(6));
-
-        if (!isValidCoordinates(lat, lng)) {
-          setGeoError('Device returned invalid geographic coordinates.');
-          return;
-        }
-
+    try {
+      const result = await getCurrentDeviceLocation();
+      if (result.success && result.coords) {
+        const lat = result.coords.latitude;
+        const lng = result.coords.longitude;
         setIsManualLocation(true);
         setCoordinates({ latitude: lat, longitude: lng });
         setGeoStatus(`Device location set to ${lat.toFixed(6)}° N, ${lng.toFixed(6)}° E`);
+        setGeoError(null);
 
         resolveLocationDetails(lat, lng);
-      },
-      (err) => {
-        setIsLocating(false);
-        switch (err.code) {
-          case err.PERMISSION_DENIED:
-            setGeoError('Location permission denied. Please allow location access in your browser or click on the map to pin your mess.');
-            break;
-          case err.POSITION_UNAVAILABLE:
-            setGeoError('Device location information is unavailable. Please click or drag the marker on the map to pin your mess.');
-            break;
-          case err.TIMEOUT:
-            setGeoError('Location request timed out. Please try again or pin your mess directly on the map.');
-            break;
-          default:
-            setGeoError('Unable to detect device location. Please pin your mess directly on the map.');
-            break;
-        }
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 0,
+      } else {
+        const fullMessage = result.recoveryTip
+          ? `${result.message} ${result.recoveryTip}`
+          : result.message;
+        setGeoError(fullMessage);
       }
-    );
+    } catch (err: any) {
+      setGeoError(err?.message || 'Unable to detect device location. Please pin your mess directly on the map.');
+    } finally {
+      setIsLocating(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -998,6 +987,27 @@ export const RegisterPage: React.FC = () => {
                   >
                     <AlertCircle size={15} style={{ flexShrink: 0 }} />
                     <span>{geoError}</span>
+                  </div>
+                )}
+
+                {/* Reverse-Geocoding Notice (Separate from Geolocation Error) */}
+                {reverseGeocodeError && (
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      background: '#fffbeb',
+                      border: '1px solid #fde68a',
+                      color: '#92400e',
+                      borderRadius: '6px',
+                      padding: '8px 12px',
+                      fontSize: '0.78rem',
+                      marginBottom: '0.75rem',
+                    }}
+                  >
+                    <AlertCircle size={15} style={{ flexShrink: 0 }} />
+                    <span>{reverseGeocodeError}</span>
                   </div>
                 )}
 

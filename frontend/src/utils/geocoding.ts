@@ -76,18 +76,30 @@ export const POPULAR_PUNE_AREAS = [
 
 /**
  * Validate latitude and longitude values.
+ * Allows zero on a single axis (Equator / Prime Meridian) while rejecting (0, 0) Null Island unless allowZero: true.
  */
-export function isValidCoordinates(lat: number, lng: number): boolean {
-  return (
-    typeof lat === 'number' &&
-    typeof lng === 'number' &&
-    !isNaN(lat) &&
-    !isNaN(lng) &&
-    lat >= -90.0 &&
-    lat <= 90.0 &&
-    lng >= -180.0 &&
-    lng <= 180.0
-  );
+export function isValidCoordinates(
+  lat: number | null | undefined,
+  lng: number | null | undefined,
+  options?: { allowZero?: boolean }
+): boolean {
+  if (lat === null || lat === undefined || lng === null || lng === undefined) {
+    return false;
+  }
+  if (typeof lat !== 'number' || typeof lng !== 'number') {
+    return false;
+  }
+  if (isNaN(lat) || isNaN(lng) || !isFinite(lat) || !isFinite(lng)) {
+    return false;
+  }
+  if (lat < -90.0 || lat > 90.0 || lng < -180.0 || lng > 180.0) {
+    return false;
+  }
+  const isBothZero = Math.abs(lat) < 0.000001 && Math.abs(lng) < 0.000001;
+  if (isBothZero && !options?.allowZero) {
+    return false;
+  }
+  return true;
 }
 
 export interface GeocodeResult {

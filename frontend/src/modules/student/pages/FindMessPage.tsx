@@ -26,8 +26,12 @@ import { MessItem } from '../../../types/student.types';
 import {
   POPULAR_PUNE_AREAS,
   calculateHaversineDistanceKm,
-  isValidCoordinates,
 } from '../../../utils/geocoding';
+import {
+  getCurrentDeviceLocation,
+  isValidCoordinates,
+} from '../../../utils/geolocation';
+import { GeolocationDiagnosticPanel } from '../components/GeolocationDiagnosticPanel';
 
 export const FindMessPage: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -83,47 +87,28 @@ export const FindMessPage: React.FC = () => {
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
-  // Geolocation trigger
-  const handleUseCurrentLocation = () => {
-    if (!navigator.geolocation) {
-      setLocationError('Browser Geolocation is not supported by your current browser.');
-      return;
-    }
+  // Geolocation trigger with resilient two-phase detection
+  const handleUseCurrentLocation = async () => {
     setIsLocating(true);
     setLocationError(null);
 
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setIsLocating(false);
-        const lat = Number(pos.coords.latitude.toFixed(6));
-        const lng = Number(pos.coords.longitude.toFixed(6));
-        if (isValidCoordinates(lat, lng)) {
-          setStudentLocation({ lat, lng });
-          setIsNearbyOnly(true);
-          setLocationError(null);
-        } else {
-          setLocationError('Device returned invalid geographic coordinates.');
-        }
-      },
-      (err) => {
-        setIsLocating(false);
-        switch (err.code) {
-          case err.PERMISSION_DENIED:
-            setLocationError('Location permission was denied. Please allow location access in your browser or search by campus locality.');
-            break;
-          case err.POSITION_UNAVAILABLE:
-            setLocationError('Device location information is unavailable. You can continue searching by locality or college name.');
-            break;
-          case err.TIMEOUT:
-            setLocationError('Location request timed out. Please retry or filter by locality.');
-            break;
-          default:
-            setLocationError('Unable to detect current location. Please filter by campus locality.');
-            break;
-        }
-      },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-    );
+    try {
+      const result = await getCurrentDeviceLocation();
+      if (result.success && result.coords) {
+        setStudentLocation({ lat: result.coords.latitude, lng: result.coords.longitude });
+        setIsNearbyOnly(true);
+        setLocationError(null);
+      } else {
+        const fullMessage = result.recoveryTip
+          ? `${result.message} ${result.recoveryTip}`
+          : result.message;
+        setLocationError(fullMessage);
+      }
+    } catch (err: any) {
+      setLocationError(err?.message || 'Unable to detect device location. You can continue searching by locality or college name.');
+    } finally {
+      setIsLocating(false);
+    }
   };
 
   const handleClearLocation = () => {
@@ -305,6 +290,17 @@ export const FindMessPage: React.FC = () => {
         </p>
       </div>
 
+      {/* Optional Development Geolocation Diagnostic Panel (defaults to OFF) */}
+      {typeof window !== 'undefined' && (window as any).__MESSMAP_DEV_GEO_PANEL__ === true && (
+        <GeolocationDiagnosticPanel
+          onLocationDetected={(coords) => {
+            setStudentLocation({ lat: coords.latitude, lng: coords.longitude });
+            setIsNearbyOnly(true);
+            setLocationError(null);
+          }}
+        />
+      )}
+
       {/* SEARCH BAR & CONTROLS */}
       <div className="card" style={{ padding: '1.25rem', marginBottom: '1.5rem' }}>
         {/* Student Geolocation Toolbar */}
@@ -402,27 +398,54 @@ export const FindMessPage: React.FC = () => {
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              gap: '8px',
+              gap: '12px',
               background: '#fef2f2',
               border: '1px solid #fecaca',
               color: '#991b1b',
-              padding: '8px 12px',
-              borderRadius: '6px',
-              fontSize: '0.82rem',
+              padding: '10px 14px',
+              borderRadius: '8px',
+              fontSize: '0.84rem',
               marginBottom: '1rem',
+              boxShadow: 'var(--shadow-xs)',
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <AlertCircle size={16} />
-              <span>{locationError}</span>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+              <AlertCircle size={16} style={{ flexShrink: 0, marginTop: '2px' }} />
+              <div>
+                <span style={{ fontWeight: 700 }}>Location Notice:</span> {locationError}
+              </div>
             </div>
-            <button
-              type="button"
-              onClick={() => setLocationError(null)}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#991b1b' }}
-            >
-              <X size={14} />
-            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setLocationError(null);
+                  const locSelect = document.getElementById('find-mess-locality-select');
+                  locSelect?.focus();
+                }}
+                className="btn btn-xs"
+                style={{
+                  background: '#ffffff',
+                  border: '1px solid #fca5a5',
+                  color: '#991b1b',
+                  fontSize: '0.75rem',
+                  padding: '3px 8px',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  fontWeight: 600,
+                }}
+              >
+                Search by Locality
+              </button>
+              <button
+                type="button"
+                onClick={() => setLocationError(null)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#991b1b', padding: '2px' }}
+                aria-label="Dismiss alert"
+              >
+                <X size={15} />
+              </button>
+            </div>
           </div>
         )}
 
@@ -594,6 +617,7 @@ export const FindMessPage: React.FC = () => {
             <MapPin size={14} color="var(--primary)" />
             <span style={{ color: 'var(--text-muted)' }}>Locality:</span>
             <select
+              id="find-mess-locality-select"
               value={selectedLocality}
               onChange={(e) => setSelectedLocality(e.target.value)}
               style={{

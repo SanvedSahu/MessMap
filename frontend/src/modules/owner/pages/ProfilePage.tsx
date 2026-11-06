@@ -19,6 +19,7 @@ import {
   Search,
   AlertCircle,
   RefreshCw,
+  Crosshair,
 } from 'lucide-react';
 import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from 'react-leaflet';
 import { useOutletContext } from 'react-router-dom';
@@ -41,6 +42,7 @@ import {
   isValidCoordinates,
   POPULAR_PUNE_AREAS,
 } from '../../../utils/geocoding';
+import { getCurrentDeviceLocation } from '../../../utils/geolocation';
 import './ProfilePage.css';
 
 // Custom Map Marker Pin for Mess Owner Location
@@ -154,6 +156,7 @@ export const ProfilePage: React.FC = () => {
   const [geocodingStatus, setGeocodingStatus] = useState<string | null>(null);
   const [geocodingError, setGeocodingError] = useState<string | null>(null);
   const [isGeocoding, setIsGeocoding] = useState<boolean>(false);
+  const [isLocating, setIsLocating] = useState<boolean>(false);
 
   // Pricing & Description states
   const [monthlyPrice, setMonthlyPrice] = useState(savedProfile?.monthlyPrice || '3200');
@@ -356,6 +359,25 @@ export const ProfilePage: React.FC = () => {
       setGeocodingStatus(null);
     } finally {
       setIsGeocoding(false);
+    }
+  };
+
+  // Retrieve device coordinates using resilient browser Geolocation API
+  const handleUseCurrentLocation = async () => {
+    setIsLocating(true);
+    setGeocodingError(null);
+    try {
+      const result = await getCurrentDeviceLocation();
+      if (result.success && result.coords) {
+        handlePinMoved(result.coords.latitude, result.coords.longitude);
+      } else {
+        const fullMsg = result.recoveryTip ? `${result.message} ${result.recoveryTip}` : result.message;
+        setGeocodingError(fullMsg);
+      }
+    } catch (err: any) {
+      setGeocodingError(err?.message || 'Unable to detect device location.');
+    } finally {
+      setIsLocating(false);
     }
   };
 
@@ -723,22 +745,41 @@ export const ProfilePage: React.FC = () => {
                 </p>
               </div>
               {isEditing && (
-                <button
-                  type="button"
-                  onClick={() => handleAddressGeocode()}
-                  disabled={isGeocoding}
-                  className="btn btn-secondary"
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    padding: '6px 12px',
-                    fontSize: '0.8rem',
-                  }}
-                >
-                  {isGeocoding ? <RefreshCw size={14} className="spin" /> : <Search size={14} />}
-                  Find on Map
-                </button>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    onClick={() => handleUseCurrentLocation()}
+                    disabled={isLocating || isGeocoding}
+                    className="btn btn-outline"
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      padding: '6px 12px',
+                      fontSize: '0.8rem',
+                      fontWeight: 600,
+                    }}
+                  >
+                    {isLocating ? <RefreshCw size={14} className="spin" /> : <Crosshair size={14} color="var(--primary)" />}
+                    {isLocating ? 'Detecting Location...' : 'Use My Current Location'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleAddressGeocode()}
+                    disabled={isLocating || isGeocoding}
+                    className="btn btn-secondary"
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      padding: '6px 12px',
+                      fontSize: '0.8rem',
+                    }}
+                  >
+                    {isGeocoding ? <RefreshCw size={14} className="spin" /> : <Search size={14} />}
+                    Find on Map
+                  </button>
+                </div>
               )}
             </div>
 

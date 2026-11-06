@@ -22,7 +22,8 @@ import { MessCard } from '../components/MessCard';
 import { useAuth } from '../../../context/AuthContext';
 import { useFavorites } from '../../../context/FavoritesContext';
 import { MessItem } from '../../../types/student.types';
-import { calculateHaversineDistanceKm, isValidCoordinates } from '../../../utils/geocoding';
+import { calculateHaversineDistanceKm } from '../../../utils/geocoding';
+import { getCurrentDeviceLocation, isValidCoordinates } from '../../../utils/geolocation';
 
 export const StudentDashboardPage: React.FC = () => {
   const { user } = useAuth();
@@ -38,45 +39,26 @@ export const StudentDashboardPage: React.FC = () => {
   const [isLocating, setIsLocating] = useState<boolean>(false);
   const [locationError, setLocationError] = useState<string | null>(null);
 
-  const handleUseCurrentLocation = () => {
-    if (!navigator.geolocation) {
-      setLocationError('Geolocation is not supported by your browser.');
-      return;
-    }
+  const handleUseCurrentLocation = async () => {
     setIsLocating(true);
     setLocationError(null);
 
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setIsLocating(false);
-        const lat = Number(pos.coords.latitude.toFixed(6));
-        const lng = Number(pos.coords.longitude.toFixed(6));
-        if (isValidCoordinates(lat, lng)) {
-          setStudentLocation({ lat, lng });
-          setLocationError(null);
-        } else {
-          setLocationError('Device returned invalid geographic coordinates.');
-        }
-      },
-      (err) => {
-        setIsLocating(false);
-        switch (err.code) {
-          case err.PERMISSION_DENIED:
-            setLocationError('Location permission was denied. Please allow access in browser settings.');
-            break;
-          case err.POSITION_UNAVAILABLE:
-            setLocationError('Device location is unavailable.');
-            break;
-          case err.TIMEOUT:
-            setLocationError('Location request timed out. Please retry.');
-            break;
-          default:
-            setLocationError('Unable to detect device location.');
-            break;
-        }
-      },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-    );
+    try {
+      const result = await getCurrentDeviceLocation();
+      if (result.success && result.coords) {
+        setStudentLocation({ lat: result.coords.latitude, lng: result.coords.longitude });
+        setLocationError(null);
+      } else {
+        const fullMessage = result.recoveryTip
+          ? `${result.message} ${result.recoveryTip}`
+          : result.message;
+        setLocationError(fullMessage);
+      }
+    } catch (err: any) {
+      setLocationError(err?.message || 'Unable to detect device location.');
+    } finally {
+      setIsLocating(false);
+    }
   };
 
   const handleClearLocation = () => {
